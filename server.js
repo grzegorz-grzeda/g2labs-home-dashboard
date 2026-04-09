@@ -34,14 +34,19 @@ function parseAtcServiceData(hex) {
   // [8]    Humidity uint8 %
   // [9]    Battery level uint8 %
   // [10-11] Battery voltage uint16 BE mV
-  // [12]   Frame counter (skip)
+  // [12]   Frame counter uint8
   if (hex.length < 26) return null; // 13 bytes = 26 hex chars
   const buf = Buffer.from(hex, 'hex');
-  const temperature = buf.readInt16BE(6) / 10;
-  const humidity = buf.readUInt8(8);
-  const battery = buf.readUInt8(9);
-  return { temperature, humidity, battery };
+  const temperature  = buf.readInt16BE(6) / 10;
+  const humidity     = buf.readUInt8(8);
+  const battery      = buf.readUInt8(9);
+  const frameCounter = buf.readUInt8(12);
+  return { temperature, humidity, battery, frameCounter };
 }
+
+// Dedup window: ignore a reading if the same locationId+frameCounter
+// was already stored within this many seconds (handles multiple scanners).
+const DEDUP_WINDOW_SECONDS = 10;
 
 mqttClient.on('connect', () => {
   console.log(`MQTT connected, subscribing to "${TOPIC}"`);
@@ -70,9 +75,18 @@ mqttClient.on('message', async (topic, payload) => {
   const location = await Location.findOne({ sensorMac: address.toUpperCase() });
   if (!location) return;
 
-  const { temperature, humidity, battery } = parsed;
+  const { temperature, humidity, battery, frameCounter } = parsed;
 
-  await Reading.create({ locationId: location._id, temperature, humidity, battery, rssi });
+  // Deduplicate: drop if same frameCounter seen for this location within the window
+  const dedupSince = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
+  const exists = await Reading.exists({
+    locationId: location._id,
+    frameCounter,
+    timestamp: { $gte: dedupSince },
+  });
+  if (exists) return;
+
+  await Reading.create({ locationId: location._id, temperature, humidity, battery, rssi, frameCounter });
 
   io.emit('reading', {
     locationId: location._id.toString(),
@@ -117,13 +131,14 @@ app.get('/api/history/:locationId', async (req, res) => {
         groupBy: '$timestamp',
         buckets: CHART_BUCKETS,
         output: {
-          timestamp:   { $avg: '$timestamp' },
+          timestamp:   { $avg: { $toLong: '$timestamp' } },
           temperature: { $avg: '$temperature' },
           humidity:    { $avg: '$humidity' },
           battery:     { $last: '$battery' },
         },
       },
     },
+    { $addFields: { timestamp: { $toDate: '$timestamp' } } },
     { $sort: { timestamp: 1 } },
   ]);
 
