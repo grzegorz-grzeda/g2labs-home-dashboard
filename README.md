@@ -137,6 +137,9 @@ The browser UI now lives in a dedicated React/Vite project:
 - `frontend-dist/` contains the generated build output
 - Express serves the compiled frontend from `frontend-dist/`
 - [docs/API.md](docs/API.md) documents the HTTP contract used between the React app and the backend
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) covers runtime/bootstrap/maintenance workflows
+- [docs/TESTING.md](docs/TESTING.md) explains the current test layers and commands
+- [docs/MIGRATIONS.md](docs/MIGRATIONS.md) records important data-model and bootstrap transitions
 
 ## Versioning
 

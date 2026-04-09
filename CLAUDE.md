@@ -5,6 +5,9 @@
 Read only the files relevant to the area you are changing:
 
 - Always read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing data flow, ingestion, persistence, or charting behavior.
+- Read [docs/OPERATIONS.md](docs/OPERATIONS.md) when changing runtime workflows, bootstrap commands, or operational behavior.
+- Read [docs/TESTING.md](docs/TESTING.md) when changing test structure, verification expectations, or test commands.
+- Read [docs/MIGRATIONS.md](docs/MIGRATIONS.md) when changing stored fields, backfills, or migration/bootstrap behavior.
 - Read [src/app.js](src/app.js) and [src/server.js](src/server.js) when changing app wiring, middleware, HTTP setup, Socket.io, MongoDB startup, or MQTT startup.
 - Read [src/models/](src/models/) when changing stored fields, validation, or delete behavior.
 - Read [src/mqtt/](src/mqtt/) when changing ATC parsing or MQTT topic handling.
@@ -65,6 +68,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - After changing code, run a relevant verification step before handoff. Treat this as required, not optional.
 - Run the narrowest useful check that gives confidence in the changed area.
 - When code edits change API routes, contracts, auth rules, or error behavior, also check whether [docs/API.md](docs/API.md) needs an update and make that update before handoff. Treat this as mandatory, not optional.
+- When code edits change runtime workflows, bootstrap behavior, test strategy, or persisted-field expectations, also check whether [docs/OPERATIONS.md](docs/OPERATIONS.md), [docs/TESTING.md](docs/TESTING.md), or [docs/MIGRATIONS.md](docs/MIGRATIONS.md) need updates and make them before handoff.
 - For server changes, at minimum verify the app still starts with `npm start` or `npm run dev`.
 - For UI changes, prefer `npm test` so unit and Playwright coverage stay aligned. If Playwright does not cover the affected behavior, also verify the affected screen in both desktop and mobile-sized layouts when possible.
 - If a meaningful verification step could not be run, say so clearly in the handoff and explain why.

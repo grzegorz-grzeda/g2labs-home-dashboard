@@ -43,6 +43,9 @@ frontend-dist/          — generated client build served by Express (gitignored
 docs/
   ARCHITECTURE.md
   API.md
+  OPERATIONS.md
+  TESTING.md
+  MIGRATIONS.md
   img/
 ```
 
