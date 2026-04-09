@@ -17,7 +17,13 @@ src/
     mock-generator.js   — generated readings source for tests/demo mode
     atc.js              — pure ATC frame decoder (hex → { temperature, humidity, battery, frameCounter })
   services/
+    auth-service.js     — request user resolution, login/logout cookie orchestration, `/api/me` shaping
+    access-service.js   — admin access-management orchestration
+    location-service.js — location CRUD orchestration
+    readings-query-service.js — current/history query orchestration
     readings.js         — injected reading handler: location lookup, deduplication, DB write, Socket.io emit
+  bootstrap/
+    access-bootstrap.js — shared Mongo bootstrap/migration path for default groups, users, and legacy backfills
   routes/
     admin.js            — admin-only router factory for groups and user access management
     locations.js        — location CRUD router factory
@@ -97,6 +103,11 @@ ATC MiThermometer (BLE advertisement)
 | `src/mqtt/mock-generator.js` | Synthetic reading source for tests and local demos |
 | `src/mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
 | `src/services/readings.js` | Injected reading handler: lookup, dedup, DB write, Socket.io emit |
+| `src/services/auth-service.js` | Application service for request auth/session orchestration |
+| `src/services/access-service.js` | Application service for admin group/user management flows |
+| `src/services/location-service.js` | Application service for location CRUD flows |
+| `src/services/readings-query-service.js` | Application service for current/history query flows |
+| `src/bootstrap/access-bootstrap.js` | Shared default-access bootstrap/migration logic for Mongo deployments |
 | `src/routes/admin.js` | Admin-only router for groups and user membership management |
 | `src/routes/locations.js` | Location CRUD router factory |
 | `src/routes/readings.js` | Current + history query router factory |
@@ -155,6 +166,12 @@ Single Node.js process. Modules communicate via a Node.js EventEmitter, not a me
 
 ### Dependency injection: adapters chosen at startup
 The entry point composes the app from injected dependencies. Production uses MongoDB + MQTT. Test/demo mode can swap these for an in-memory db and a generated reading source without changing route logic, Socket.io behavior, or reading processing rules.
+
+### Application services: thin routes over explicit orchestration
+Routes now delegate to small application services rather than calling the db adapter directly. This keeps HTTP concerns in `routes/`, orchestration in `services/`, and persistence details inside the adapters, while preserving the shared API contract layer.
+
+### Operations: explicit Mongo access bootstrap
+Mongo-backed deployments use a shared bootstrap path to backfill legacy `groupId`, `groupIds`, `role`, and `passwordHash` fields and to create default access records when needed. The same logic runs at server startup and is also exposed through `npm run bootstrap:mongo` for explicit operational use.
 
 ### Chart scales: shared across locations, ±5 padding
 All location charts use the same y-axis min/max so sensors can be visually compared. Scales are computed from the global min/max of all loaded data, with ±5 units of padding. Scales are recalculated live when an incoming reading would breach the current padding.

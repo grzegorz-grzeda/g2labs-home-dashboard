@@ -13,11 +13,11 @@ function isDuplicateSensorMacError(err) {
   return err && err.code === 11000;
 }
 
-function createLocationsRouter({ db }) {
+function createLocationsRouter({ locationService }) {
   const router = express.Router();
 
   router.get('/', asyncHandler(async (req, res) => {
-    const locations = await db.listLocations(req.userContext);
+    const locations = await locationService.listLocations(req.userContext);
     sendContract(res, { parser: parseLocationsResponse, body: locations });
   }));
 
@@ -30,7 +30,7 @@ function createLocationsRouter({ db }) {
     }
 
     try {
-      const location = await db.createLocation(req.userContext, payload);
+      const location = await locationService.createLocation(req.userContext, payload);
       sendContract(res, { status: 201, parser: parseLocation, body: location });
     } catch (err) {
       if (isDuplicateSensorMacError(err)) return sendError(res, 409, 'DUPLICATE_SENSOR_MAC', 'sensorMac already assigned');
@@ -48,7 +48,7 @@ function createLocationsRouter({ db }) {
     }
 
     try {
-      const location = await db.updateLocation(req.userContext, req.params.id, update);
+      const location = await locationService.updateLocation(req.userContext, req.params.id, update);
       if (!location) return sendError(res, 404, 'NOT_FOUND', 'not found');
       sendContract(res, { parser: parseLocation, body: location });
     } catch (err) {
@@ -60,7 +60,7 @@ function createLocationsRouter({ db }) {
 
   router.delete('/:id', asyncHandler(async (req, res) => {
     try {
-      const deleted = await db.deleteLocation(req.userContext, req.params.id);
+      const deleted = await locationService.deleteLocation(req.userContext, req.params.id);
       if (!deleted) return sendError(res, 404, 'NOT_FOUND', 'not found');
       sendContract(res, { parser: parseOkResponse, body: { ok: true } });
     } catch (err) {

@@ -73,6 +73,23 @@ APP_MODE=test npm start
 
 Then open [http://localhost:3000](http://localhost:3000).
 
+## Mongo bootstrap
+
+For existing Mongo-backed installs, you can now run the access bootstrap explicitly:
+
+```bash
+npm run bootstrap:mongo
+```
+
+That command applies the same default-access migration used by the server at startup:
+
+- creates `Default Home` if no groups exist
+- creates `Default Admin` if no users exist
+- backfills missing `groupId`, `groupIds`, `role`, and `passwordHash` fields on legacy documents
+- promotes the first user to `admin` if no admin exists yet
+
+This is useful when preparing a database ahead of deployment instead of relying on implicit startup repair.
+
 ## Test mode
 
 For UI testing or local development without MongoDB and MQTT, run:
@@ -132,6 +149,7 @@ The browser UI now lives in a dedicated React/Vite project:
 Current coverage includes:
 
 - API-level authentication and authorization responses
+- direct service-layer coverage for auth, access, locations, readings queries, and Mongo bootstrap behavior
 - shared contract validation for key API request/response shapes
 - dashboard smoke test for seeded cards and charts
 - login flow with persisted authenticated sessions
@@ -167,6 +185,16 @@ Default Mongo bootstrap behavior:
 - users missing `groupIds` are backfilled to `Default Home`
 - users missing `passwordHash` are backfilled to `DEFAULT_USER_PASSWORD`
 - if no admin exists, the first user is promoted to `admin`
+
+## Backend structure
+
+The backend now uses a small application-service layer between routes and adapters:
+
+- `src/services/auth-service.js` handles request user resolution, login, logout cookie creation, and `/api/me`
+- `src/services/location-service.js` handles location CRUD orchestration
+- `src/services/access-service.js` handles admin access-management orchestration
+- `src/services/readings-query-service.js` handles current/history query orchestration
+- `src/bootstrap/access-bootstrap.js` contains the shared Mongo default-access bootstrap path used by both startup and `npm run bootstrap:mongo`
 
 ## Data flow
 

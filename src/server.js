@@ -78,6 +78,9 @@ async function startServer(config = getConfig()) {
   readingSource.on('reading', onReading);
 
   await db.connect();
+  if (typeof db.ensureAccessBootstrap === 'function') {
+    await db.ensureAccessBootstrap();
+  }
   if (typeof readingSource.start === 'function') readingSource.start();
 
   await new Promise(resolve => {

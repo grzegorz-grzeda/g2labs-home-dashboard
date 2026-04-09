@@ -22,15 +22,12 @@ function isForbiddenAdminError(err) {
   return err && err.code === 'FORBIDDEN_ADMIN';
 }
 
-function createAdminRouter({ db }) {
+function createAdminRouter({ accessService }) {
   const router = express.Router();
 
   router.get('/access', asyncHandler(async (req, res) => {
     try {
-      const [groups, users] = await Promise.all([
-        db.listGroups(req.userContext),
-        db.listUsers(req.userContext),
-      ]);
+      const { groups, users } = await accessService.getAccessOverview(req.userContext);
       sendContract(res, {
         parser: parseAdminAccessResponse,
         body: { groups, users },
@@ -50,7 +47,7 @@ function createAdminRouter({ db }) {
     }
 
     try {
-      const group = await db.createGroup(req.userContext, payload);
+      const group = await accessService.createGroup(req.userContext, payload);
       sendContract(res, { status: 201, parser: parseGroup, body: group });
     } catch (err) {
       if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
@@ -68,7 +65,7 @@ function createAdminRouter({ db }) {
     }
 
     try {
-      const user = await db.createUser(req.userContext, payload);
+      const user = await accessService.createUser(req.userContext, payload);
       sendContract(res, { status: 201, parser: parseUserWithGroups, body: user });
     } catch (err) {
       if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
@@ -86,7 +83,7 @@ function createAdminRouter({ db }) {
     }
 
     try {
-      const user = await db.updateUser(req.userContext, req.params.id, update);
+      const user = await accessService.updateUser(req.userContext, req.params.id, update);
       if (!user) return sendError(res, 404, 'NOT_FOUND', 'not found');
       sendContract(res, { parser: parseUserWithGroups, body: user });
     } catch (err) {

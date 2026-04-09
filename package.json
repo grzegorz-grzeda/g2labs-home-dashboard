@@ -7,6 +7,7 @@
     "build:client": "vite build",
     "start": "npm run build:client && node src/server.js",
     "start:test": "npm run build:client && node src/server.js",
+    "bootstrap:mongo": "node scripts/bootstrap-mongo.js",
     "dev": "node --watch src/server.js",
     "dev:client": "vite",
     "test": "npm run test:unit && npm run test:ui",

@@ -9,6 +9,7 @@ Read only the files relevant to the area you are changing:
 - Read [src/models/](src/models/) when changing stored fields, validation, or delete behavior.
 - Read [src/mqtt/](src/mqtt/) when changing ATC parsing or MQTT topic handling.
 - Read [src/services/](src/services/) when changing deduplication, DB writes, or socket emission.
+- Read [src/bootstrap/](src/bootstrap/) when changing Mongo bootstrap, legacy backfills, or deployment migration behavior.
 - Read [src/routes/](src/routes/) when changing HTTP endpoints.
 - Read [docs/API.md](docs/API.md) and [shared/contracts/](shared/contracts/) when changing API endpoints, request/response payloads, error codes, or authentication behavior.
 - Read [frontend/](frontend/) when changing dashboard UI behavior, theming, or responsive layout.
@@ -28,6 +29,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 
 - New MQTT parsing and subscription logic belongs in `src/mqtt/`.
 - Business logic belongs in `src/services/`.
+- Mongo bootstrap and legacy data-repair logic belongs in `src/bootstrap/`.
 - HTTP endpoints belong in `src/routes/`.
 - Keep `src/server.js` and `src/app.js` focused on wiring and startup.
 
@@ -42,6 +44,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Users can belong to multiple groups.
 - Users have a role; admin users can access all groups.
 - Users authenticate with username/password and a signed cookie-backed session.
+- Preserve the explicit `npm run bootstrap:mongo` operational path when changing Mongo bootstrap behavior.
 - Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
 - Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
 - Preserve the shared contract layer in `shared/contracts/` when changing API request/response shapes.

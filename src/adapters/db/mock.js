@@ -194,6 +194,8 @@ function createMockDb({ initialGroups, initialUsers, initialLocations, initialRe
   return {
     async connect() {},
 
+    async ensureAccessBootstrap() {},
+
     async disconnect() {},
 
     async resolveUserContext(userId, { failIfMissing = false } = {}) {
