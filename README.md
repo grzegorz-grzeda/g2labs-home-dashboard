@@ -2,6 +2,8 @@
 
 A local web dashboard for ATC MiThermometer BLE sensor data. Subscribes to MQTT topics published by [blester](https://github.com/g2labs/blester), stores readings in MongoDB, and presents current values and historical plots in a browser.
 
+![Dashboard screenshot](docs/img/screenshot.png)
+
 ## Features
 
 - Parses ATC custom advertisement format from blester MQTT payloads
