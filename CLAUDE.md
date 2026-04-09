@@ -46,10 +46,11 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 
 ## Verification
 
-- Run the narrowest useful check after changes.
+- After changing code, run a relevant verification step before handoff. Treat this as required, not optional.
+- Run the narrowest useful check that gives confidence in the changed area.
 - For server changes, at minimum verify the app still starts with `npm start` or `npm run dev`.
-- For UI changes, verify the affected screen in both desktop and mobile-sized layouts when possible.
-- If you could not run a meaningful check, say so clearly in the handoff.
+- For UI changes, run `npm run test:ui` when the affected behavior is covered by Playwright. If not, verify the affected screen in both desktop and mobile-sized layouts when possible.
+- If a meaningful verification step could not be run, say so clearly in the handoff and explain why.
 
 ## Commit guidance
 
