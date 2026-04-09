@@ -17,12 +17,12 @@ app.use(express.json());
 app.use('/api/locations', locationsRouter);
 
 // MongoDB
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/home-dashboard')
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB error:', err));
 
 // MQTT
-const mqttClient = mqtt.connect(process.env.MQTT_BROKER);
+const mqttClient = mqtt.connect(process.env.MQTT_BROKER || 'mqtt://localhost:1883');
 const TOPIC = process.env.MQTT_TOPIC || 'atc';
 
 const ATC_UUID = '0000181a-0000-1000-8000-00805f9b34fb';
