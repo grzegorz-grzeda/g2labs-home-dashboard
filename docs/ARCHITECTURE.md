@@ -27,10 +27,13 @@ src/
     User.js             — { name, username, passwordHash, role, groupIds[] }
     Location.js         — { name, sensorMac, groupId }
     Reading.js          — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
-public/
-  index.html
-  style.css
-  app.js                — dashboard UI: login/logout, cards, charts, access management, location management, theme toggle
+frontend/
+  index.html            — Vite entry HTML
+  src/
+    main.jsx            — React entry point
+    App.jsx             — dashboard SPA shell and state management
+    styles.css          — dashboard styles
+frontend-dist/          — generated client build served by Express (gitignored)
 docs/
   ARCHITECTURE.md
   img/
@@ -100,7 +103,9 @@ ATC MiThermometer (BLE advertisement)
 | `src/models/User.js` | Mongoose schema for users and group membership |
 | `src/models/Location.js` | Mongoose schema for named sensor locations |
 | `src/models/Reading.js` | Mongoose schema for timestamped sensor readings |
-| `public/app.js` | Dashboard UI: login/logout, cards, charts, access management, location management, theme toggle |
+| `frontend/src/App.jsx` | React dashboard UI: login/logout, cards, charts, access management, location management, theme toggle |
+| `frontend/src/styles.css` | Client-side styling for the React dashboard |
+| `vite.config.js` | Vite build config targeting `frontend-dist/` |
 
 ## Decisions log
 
@@ -133,6 +138,9 @@ The dashboard includes an admin-only Access Management section. It is backed by 
 Passwords are stored as salted `scrypt` hashes. Successful login returns an HTTP-only signed cookie. That cookie is the single source of truth for both API authorization and live Socket.io subscriptions, which keeps browser refreshes and websocket reconnects consistent without a separate session store.
 
 The test suite includes direct HTTP integration coverage for `401` and `403` access-control behavior in addition to UI-level Playwright flows.
+
+### Frontend: React SPA built with Vite
+The browser UI is now a dedicated React application under `frontend/`. Express serves the compiled assets from `frontend-dist/`, which is produced by `npm run build:client`. This keeps the backend API and Socket.io wiring unchanged while giving the frontend proper component/state structure.
 
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.

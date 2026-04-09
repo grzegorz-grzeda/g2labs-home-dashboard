@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const {
   getSessionUserId,
   serializeLogoutCookie,
@@ -10,8 +11,9 @@ const createReadingsRouter = require('./routes/readings');
 
 function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
   const app = express();
+  const clientDistPath = path.resolve(__dirname, '..', 'frontend-dist');
 
-  app.use(express.static('public'));
+  app.use(express.static(clientDistPath, { index: false }));
   app.use(express.json());
   app.use(async (req, res, next) => {
     try {
@@ -65,6 +67,11 @@ function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
     if (err && err.code === 'FORBIDDEN_ADMIN') return res.status(403).json({ error: 'admin access required' });
     console.error(err);
     res.status(500).json({ error: 'internal server error' });
+  });
+
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 
   return app;

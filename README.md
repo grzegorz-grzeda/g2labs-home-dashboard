@@ -61,8 +61,11 @@ Note: `.env.example` is a sample local-network configuration. If you omit a vari
 # Production
 npm start
 
-# Development (auto-restarts on file change)
+# Backend development (auto-restarts on file change)
 npm run dev
+
+# Frontend development (Vite)
+npm run dev:client
 
 # Test/demo mode with mock DB + generated readings
 APP_MODE=test npm start
@@ -84,6 +87,7 @@ In test mode:
 - the MQTT dependency is injected as a generated reading source
 - the dashboard still uses the same HTTP routes and Socket.io updates as production
 - seeded users and groups are available through the login form for auth and access-control testing
+- the React frontend is built from `frontend/` into `frontend-dist/` and then served by Express
 
 ## UI testing
 
@@ -105,8 +109,16 @@ npm run test:ui
 The Playwright config starts the app automatically with:
 
 ```bash
-APP_MODE=test PORT=4173 MOCK_INTERVAL_MS=250 npm start
+APP_MODE=test PORT=4173 MOCK_INTERVAL_MS=250 npm run start:test
 ```
+
+## Frontend structure
+
+The browser UI now lives in a dedicated React/Vite project:
+
+- `frontend/` contains the source app
+- `frontend-dist/` contains the generated build output
+- Express serves the compiled frontend from `frontend-dist/`
 
 Current coverage includes:
 

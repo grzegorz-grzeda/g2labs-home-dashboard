@@ -11,7 +11,7 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'APP_MODE=test PORT=4173 MOCK_INTERVAL_MS=250 npm start',
+    command: 'APP_MODE=test PORT=4173 MOCK_INTERVAL_MS=250 npm run start:test',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

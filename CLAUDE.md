@@ -10,7 +10,7 @@ Read only the files relevant to the area you are changing:
 - Read [src/mqtt/](src/mqtt/) when changing ATC parsing or MQTT topic handling.
 - Read [src/services/](src/services/) when changing deduplication, DB writes, or socket emission.
 - Read [src/routes/](src/routes/) when changing HTTP endpoints.
-- Read [public/](public/) when changing dashboard UI behavior, theming, or responsive layout.
+- Read [frontend/](frontend/) when changing dashboard UI behavior, theming, or responsive layout.
 
 ## Running the project
 
@@ -44,6 +44,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
 - Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
 - Preserve the admin Access Management UI when changing user context, groups, or location assignment flows.
+- Keep the React SPA buildable through Vite and compatible with Express serving the built assets from `frontend-dist/`.
 
 ## Frontend conventions
 
