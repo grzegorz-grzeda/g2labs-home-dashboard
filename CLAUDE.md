@@ -3,8 +3,9 @@
 ## Read first
 
 Before making any changes, read:
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target module structure, data flow, and decisions log
-- [`server.js`](server.js) — current monolith (target structure not yet implemented)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module structure, data flow, and decisions log
+- [`app.js`](app.js) — Express config (middleware, routes)
+- [`server.js`](server.js) — entry point (HTTP, Socket.io, MongoDB, MQTT)
 - [`models/`](models/) — Mongoose schemas for Location and Reading
 
 ## Running the project
@@ -18,9 +19,11 @@ Requires MongoDB and an MQTT broker. Defaults to `localhost` for both — see [`
 
 ## Architecture
 
-The current code is a monolith. The target is a layered structure:
-`mqtt/` → `services/` → `routes/`, communicating via Node.js EventEmitter.
-Refactoring is in progress — don't add new logic to `server.js`; put it in the appropriate target layer instead.
+Layered structure: `mqtt/` → `services/` → `routes/`, communicating via Node.js EventEmitter.
+- New MQTT/parsing logic belongs in `mqtt/`
+- Business logic (dedup, DB writes, socket emit) belongs in `services/`
+- HTTP endpoints belong in `routes/`
+- `server.js` and `app.js` are wiring only — avoid adding logic there
 
 ## Conventions
 
