@@ -1,20 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
+import React, { useEffect, useState } from 'react';
 import {
   createGroup,
-  createLocation,
   createUser,
-  deleteLocation,
-  getAdminAccess,
-  getCurrentReadings,
-  getHistory,
-  getLocations,
-  getMe,
-  login,
-  logout,
-  updateLocation,
   updateUser,
 } from './api';
+import { useAuthSession } from './hooks/useAuthSession';
+import { useDashboardData } from './hooks/useDashboardData';
 import AccessPage from './pages/AccessPage';
 import DashboardPage from './pages/DashboardPage';
 import LocationsPage from './pages/LocationsPage';
@@ -56,29 +47,45 @@ function formatLocalDateTime(ts, timeFormat) {
 export default function App() {
   const [theme, setTheme] = useState(getSavedTheme);
   const [timeFormat, setTimeFormat] = useState(getSavedTimeFormat);
-  const [authState, setAuthState] = useState('loading');
-  const [authError, setAuthError] = useState('');
-  const [authForm, setAuthForm] = useState({ username: '', password: '' });
-  const [status, setStatus] = useState({ text: 'Disconnected', kind: 'disconnected' });
-  const [currentUserContext, setCurrentUserContext] = useState(null);
-  const [locations, setLocations] = useState([]);
-  const [currentReadings, setCurrentReadings] = useState({});
-  const [historiesByLocation, setHistoriesByLocation] = useState({});
-  const [rangeHours, setRangeHours] = useState('24');
-  const [locationsError, setLocationsError] = useState('');
-  const [accessError, setAccessError] = useState('');
-  const [accessData, setAccessData] = useState({ groups: [], users: [] });
-  const [locationDraft, setLocationDraft] = useState({ name: '', sensorMac: '', groupId: '' });
-  const [editingLocationId, setEditingLocationId] = useState(null);
-  const [editLocationDrafts, setEditLocationDrafts] = useState({});
   const [editUserDrafts, setEditUserDrafts] = useState({});
   const [newGroupDraft, setNewGroupDraft] = useState({ name: '', description: '' });
   const [newUserDraft, setNewUserDraft] = useState({ name: '', username: '', password: '', role: 'member', groupIds: [] });
-  const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState({});
-  const socketRef = useRef(null);
-  const updateTimersRef = useRef({});
+  const {
+    authState,
+    authError,
+    authForm,
+    setAuthForm,
+    currentUserContext,
+    accessData,
+    accessError,
+    setAccessError,
+    refreshUserContext,
+    handleLogin,
+    handleLogout: endSession,
+  } = useAuthSession();
   const isAdmin = currentUserContext?.user?.role === 'admin';
   const { route, navigate } = useRoute(isAdmin);
+  const {
+    status,
+    locations,
+    currentReadings,
+    historiesByLocation,
+    rangeHours,
+    setRangeHours,
+    locationsError,
+    locationDraft,
+    setLocationDraft,
+    editingLocationId,
+    setEditingLocationId,
+    editLocationDrafts,
+    setEditLocationDrafts,
+    recentlyUpdatedIds,
+    scales,
+    loadLocations,
+    handleAddLocation,
+    handleSaveLocation,
+    handleDeleteLocation,
+  } = useDashboardData({ authState, currentUserContext, route });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -88,49 +95,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('time-format', timeFormat);
   }, [timeFormat]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function bootstrap() {
-      try {
-        const loaded = await loadUserContext();
-        if (cancelled) return;
-        if (loaded) {
-          await reloadDashboard();
-        } else {
-          setAuthState('logged-out');
-          setStatus({ text: 'Disconnected', kind: 'disconnected' });
-        }
-      } catch (error) {
-        if (cancelled) return;
-        setAuthState('logged-out');
-        setAuthError(error.message || 'Failed to initialize dashboard');
-      }
-    }
-
-    bootstrap();
-
-    return () => {
-      cancelled = true;
-      socketRef.current?.disconnect();
-      Object.values(updateTimersRef.current).forEach(timeout => clearTimeout(timeout));
-    };
-  }, []);
-
-  useEffect(() => {
-    if (authState !== 'authenticated') return undefined;
-    connectSocket();
-    return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, [authState, currentUserContext?.user?._id]);
-
-  useEffect(() => {
-    if (authState !== 'authenticated' || locations.length === 0 || route !== ROUTES.dashboard) return;
-    loadAllCharts();
-  }, [authState, locations, rangeHours, route]);
 
   useEffect(() => {
     setEditUserDrafts(previous => {
@@ -153,182 +117,21 @@ export default function App() {
     });
   }, [accessData.users]);
 
-  async function loadUserContext() {
-    try {
-      const context = await getMe();
-      await applyAuthenticatedContext(context);
-      return true;
-    } catch (error) {
-      if (error?.code === 'AUTH_REQUIRED' || error?.code === 'USER_NOT_FOUND') return false;
-      throw new Error(error.error || error.message || 'Failed to load user context');
-    }
-  }
-
-  async function applyAuthenticatedContext(context) {
-    setCurrentUserContext(context);
-    setAuthState('authenticated');
-    setAuthError('');
-    setLocationDraft(draft => ({
-      ...draft,
-      groupId: draft.groupId || context.groups[0]?._id || '',
-    }));
-    if (context.user.role === 'admin') {
-      try {
-        setAccessData(await getAdminAccess());
-      } catch (error) {
-        console.error('Failed to load admin access UI:', error);
-        setAccessError(error.error || error.message || 'Failed to load access management');
-      }
-    } else {
-      setAccessData({ groups: [], users: [] });
-      setAccessError('');
-    }
-  }
-
-  async function reloadDashboard() {
-    setLocationsError('');
-    setCurrentReadings({});
-    setHistoriesByLocation({});
-    await loadLocations();
-    const current = await getCurrentReadings();
-    const nextReadings = {};
-    current.forEach(({ location, reading }) => {
-      if (reading) {
-        nextReadings[location._id] = {
-          locationId: location._id,
-          locationName: location.name,
-          ...reading,
-        };
-      }
-    });
-    setCurrentReadings(nextReadings);
-  }
-
-  async function loadLocations() {
-    const nextLocations = await getLocations();
-    setLocations(nextLocations);
-    setLocationDraft(draft => ({
-      ...draft,
-      groupId: nextLocations[0]?.groupId || draft.groupId || currentUserContext?.groups[0]?._id || '',
-    }));
-  }
-
-  async function loadAllCharts() {
-    const histories = await Promise.all(
-      locations.map(location => getHistory(location._id, rangeHours))
-    );
-    const next = {};
-    locations.forEach((location, index) => {
-      next[location._id] = histories[index];
-    });
-    setHistoriesByLocation(next);
-  }
-
-  function connectSocket() {
-    socketRef.current?.disconnect();
-    const socket = io();
-    socketRef.current = socket;
-
-    socket.on('connect', () => setStatus({ text: 'Live', kind: 'connected' }));
-    socket.on('disconnect', () => setStatus({ text: 'Disconnected', kind: 'disconnected' }));
-    socket.on('connect_error', error => {
-      console.error('Socket connection error:', error.message);
-      setStatus({ text: 'Connection Error', kind: 'disconnected' });
-    });
-    socket.on('reading', reading => {
-      setCurrentReadings(previous => ({
-        ...previous,
-        [reading.locationId]: reading,
-      }));
-      setHistoriesByLocation(previous => {
-        const existing = previous[reading.locationId];
-        if (!existing) return previous;
-        return {
-          ...previous,
-          [reading.locationId]: [...existing, reading],
-        };
-      });
-      setRecentlyUpdatedIds(previous => ({ ...previous, [reading.locationId]: true }));
-      clearTimeout(updateTimersRef.current[reading.locationId]);
-      updateTimersRef.current[reading.locationId] = setTimeout(() => {
-        setRecentlyUpdatedIds(previous => {
-          const next = { ...previous };
-          delete next[reading.locationId];
-          return next;
-        });
-      }, 1500);
-    });
-  }
-
-  async function handleLogin(event) {
-    event.preventDefault();
-    try {
-      const context = await login(authForm);
-      setAuthForm(form => ({ ...form, password: '' }));
-      await applyAuthenticatedContext(context);
-      await reloadDashboard();
-    } catch (error) {
-      console.error('Login flow failed:', error);
-      setAuthError(error.error || error.message || 'Login failed');
-    }
-  }
-
-  async function handleLogout() {
-    socketRef.current?.disconnect();
-    await logout();
-    setAuthState('logged-out');
-    setCurrentUserContext(null);
-    setLocations([]);
-    setCurrentReadings({});
-    setHistoriesByLocation({});
-    setAccessData({ groups: [], users: [] });
-    setStatus({ text: 'Disconnected', kind: 'disconnected' });
-    navigate(ROUTES.dashboard);
-  }
-
-  async function handleAddLocation() {
-    try {
-      await createLocation(locationDraft);
-      setLocationsError('');
-      setLocationDraft(draft => ({ ...draft, name: '', sensorMac: '' }));
-      await loadLocations();
-    } catch (error) {
-      setLocationsError(error.error || error.message);
-    }
-  }
-
-  async function handleSaveLocation(id) {
-    const draft = editLocationDrafts[id];
-    try {
-      await updateLocation(id, draft);
-      setLocationsError('');
-      setEditingLocationId(null);
-      await loadLocations();
-    } catch (error) {
-      setLocationsError(error.error || error.message);
-    }
-  }
-
-  async function handleDeleteLocation(id) {
-    if (!window.confirm('Delete this location and all its readings?')) return;
-    try {
-      await deleteLocation(id);
-      await loadLocations();
-    } catch (error) {
-      setLocationsError(error.error || error.message);
-    }
-  }
-
   async function handleCreateGroup() {
     try {
       await createGroup(newGroupDraft);
       setAccessError('');
       setNewGroupDraft({ name: '', description: '' });
-      await loadUserContext();
+      await refreshUserContext();
       await loadLocations();
     } catch (error) {
       setAccessError(error.error || error.message);
     }
+  }
+
+  async function handleLogout() {
+    await endSession();
+    navigate(ROUTES.dashboard);
   }
 
   async function handleCreateUser() {
@@ -336,7 +139,7 @@ export default function App() {
       await createUser(newUserDraft);
       setAccessError('');
       setNewUserDraft({ name: '', username: '', password: '', role: 'member', groupIds: [] });
-      await loadUserContext();
+      await refreshUserContext();
     } catch (error) {
       setAccessError(error.error || error.message);
     }
@@ -351,21 +154,11 @@ export default function App() {
         groupIds: draft.groupIds,
       });
       setAccessError('');
-      await loadUserContext();
+      await refreshUserContext();
     } catch (error) {
       setAccessError(error.error || error.message);
     }
   }
-
-  const allHistoryPoints = Object.values(historiesByLocation)
-    .flat()
-    .filter(point => typeof point.temperature === 'number' && typeof point.humidity === 'number');
-  const scales = allHistoryPoints.length > 0 ? {
-    tempMin: Math.floor(Math.min(...allHistoryPoints.map(point => point.temperature))) - 5,
-    tempMax: Math.ceil(Math.max(...allHistoryPoints.map(point => point.temperature))) + 5,
-    humidMin: Math.floor(Math.min(...allHistoryPoints.map(point => point.humidity))) - 5,
-    humidMax: Math.ceil(Math.max(...allHistoryPoints.map(point => point.humidity))) + 5,
-  } : null;
 
   function renderPage() {
     if (route === ROUTES.locations) {
@@ -415,6 +208,7 @@ export default function App() {
         historiesByLocation={historiesByLocation}
         scales={scales}
         timeFormat={timeFormat}
+        currentUserContext={currentUserContext}
       />
     );
   }

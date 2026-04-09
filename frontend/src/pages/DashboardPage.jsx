@@ -1,5 +1,6 @@
 import React from 'react';
 import ChartBox from '../components/ChartBox';
+import PageIntro from '../components/PageIntro';
 
 function getTimeFormatOptions(timeFormat) {
   if (timeFormat === '24h') return { hour12: false };
@@ -28,11 +29,40 @@ export default function DashboardPage({
   historiesByLocation,
   scales,
   timeFormat,
+  currentUserContext,
 }) {
+  const readingsCount = Object.keys(currentReadings).length;
+  const latestTimestamp = Object.values(currentReadings)
+    .map(reading => reading.timestamp)
+    .sort()
+    .at(-1);
+
   return (
     <>
-      <section id="current-readings">
-        <h2>Current Readings</h2>
+      <PageIntro
+        eyebrow="Overview"
+        title="Live climate overview"
+        description="Keep an eye on the latest room conditions and compare trends across the spaces you can access."
+        actions={(
+          <div className="mini-pill">
+            <span className="mini-pill-label">Viewer</span>
+            <span className="mini-pill-value">{currentUserContext?.user?.name || 'Unknown'}</span>
+          </div>
+        )}
+        stats={[
+          { label: 'Visible locations', value: locations.length, note: 'Rooms on this dashboard' },
+          { label: 'Active cards', value: readingsCount, note: 'Latest live readouts' },
+          { label: 'Latest update', value: latestTimestamp ? formatLocalDateTime(latestTimestamp, timeFormat) : 'Waiting', note: 'Newest reading received' },
+        ]}
+      />
+
+      <section id="current-readings" className="page-panel">
+        <div className="section-heading">
+          <div>
+            <h3 className="section-title">Current readings</h3>
+            <p className="section-copy">Real-time cards stay highlighted briefly whenever a fresh MQTT reading arrives.</p>
+          </div>
+        </div>
         <div id="cards-container">
           {locations.map(location => {
             const reading = currentReadings[location._id];
@@ -65,8 +95,13 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section id="history-section">
-        <h2>History</h2>
+      <section id="history-section" className="page-panel">
+        <div className="section-heading section-heading-spread">
+          <div>
+            <h3 className="section-title">History</h3>
+            <p className="section-copy">All visible locations share the same axis ranges so you can compare rooms at a glance.</p>
+          </div>
+        </div>
         <div className="controls">
           <label>
             Range:

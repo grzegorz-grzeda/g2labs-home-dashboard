@@ -1,4 +1,5 @@
 import React from 'react';
+import PageIntro from '../components/PageIntro';
 
 function getSelectedValues(selectElement) {
   return Array.from(selectElement.selectedOptions).map(option => option.value);
@@ -18,11 +19,26 @@ export default function AccessPage({
   accessError,
 }) {
   return (
-    <section id="access-section">
-      <h2>Access Management</h2>
-      <div className="access-grid">
+    <>
+      <PageIntro
+        eyebrow="Administration"
+        title="Access management"
+        description="Shape who can see which rooms, and keep the dashboard aligned with real household or workspace boundaries."
+        stats={[
+          { label: 'Groups', value: accessData.groups.length, note: 'Current visibility zones' },
+          { label: 'Users', value: accessData.users.length, note: 'Known dashboard identities' },
+          { label: 'Admins', value: accessData.users.filter(user => user.role === 'admin').length, note: 'Full-access operators' },
+        ]}
+      />
+
+      <section id="access-section" className="access-grid">
         <div className="access-panel">
-          <h3>Groups</h3>
+          <div className="section-heading">
+            <div>
+              <h3 className="section-title">Groups</h3>
+              <p className="section-copy">Create meaningful visibility zones like floors, outbuildings, or household areas.</p>
+            </div>
+          </div>
           <div id="groups-list" className="groups-list">
             {accessData.groups.map(group => (
               <div key={group._id} className="group-pill-card">
@@ -51,7 +67,12 @@ export default function AccessPage({
         </div>
 
         <div className="access-panel">
-          <h3>Users</h3>
+          <div className="section-heading">
+            <div>
+              <h3 className="section-title">Users</h3>
+              <p className="section-copy">Adjust roles, rotate passwords, and attach people to the right group combination.</p>
+            </div>
+          </div>
           <div className="table-scroll">
             <table id="users-table">
               <thead>
@@ -190,8 +211,8 @@ export default function AccessPage({
             </table>
           </div>
         </div>
-      </div>
+      </section>
       <p id="access-error" className="error-msg">{accessError}</p>
-    </section>
+    </>
   );
 }
