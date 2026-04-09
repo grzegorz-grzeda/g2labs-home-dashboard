@@ -13,7 +13,7 @@ function extractCookie(response) {
 }
 
 async function login(baseUrl, username, password) {
-  const response = await fetch(`${baseUrl}/api/auth/login`, {
+  const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -48,22 +48,26 @@ test('API auth and access rules are enforced', async t => {
     await db.disconnect();
   });
 
-  const unauthenticatedCurrent = await fetch(`${baseUrl}/api/current`);
+  const unauthenticatedCurrent = await fetch(`${baseUrl}/api/v1/current`);
   assert.equal(unauthenticatedCurrent.status, 401);
   assert.equal(contracts.parseErrorResponse(await unauthenticatedCurrent.json()).code, 'AUTH_REQUIRED');
+
+  const legacyUnauthenticatedCurrent = await fetch(`${baseUrl}/api/current`);
+  assert.equal(legacyUnauthenticatedCurrent.status, 401);
+  assert.equal(contracts.parseErrorResponse(await legacyUnauthenticatedCurrent.json()).code, 'AUTH_REQUIRED');
 
   const adminLogin = await login(baseUrl, 'grzegorz', 'grzegorz');
   assert.equal(adminLogin.response.status, 200);
   assert.equal(contracts.parseLoginResponse(adminLogin.body).user.role, 'admin');
   assert.ok(adminLogin.cookie);
 
-  const adminAccess = await fetch(`${baseUrl}/api/admin/access`, {
+  const adminAccess = await fetch(`${baseUrl}/api/v1/admin/access`, {
     headers: { cookie: adminLogin.cookie },
   });
   assert.equal(adminAccess.status, 200);
   contracts.parseAdminAccessResponse(await adminAccess.json());
 
-  const adminLocations = await fetch(`${baseUrl}/api/locations`, {
+  const adminLocations = await fetch(`${baseUrl}/api/v1/locations`, {
     headers: { cookie: adminLogin.cookie },
   });
   const locations = contracts.parseLocationsResponse(await adminLocations.json());
@@ -75,26 +79,26 @@ test('API auth and access rules are enforced', async t => {
   assert.equal(contracts.parseLoginResponse(memberLogin.body).user.role, 'member');
   assert.ok(memberLogin.cookie);
 
-  const memberLocationsResponse = await fetch(`${baseUrl}/api/locations`, {
+  const memberLocationsResponse = await fetch(`${baseUrl}/api/v1/locations`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(memberLocationsResponse.status, 200);
   const memberLocations = contracts.parseLocationsResponse(await memberLocationsResponse.json());
   assert.equal(memberLocations.some(location => location.name === 'Garage'), false);
 
-  const memberAdminAccess = await fetch(`${baseUrl}/api/admin/access`, {
+  const memberAdminAccess = await fetch(`${baseUrl}/api/v1/admin/access`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(memberAdminAccess.status, 403);
   assert.equal(contracts.parseErrorResponse(await memberAdminAccess.json()).code, 'FORBIDDEN_ADMIN');
 
-  const forbiddenHistory = await fetch(`${baseUrl}/api/history/${garage._id}?hours=24`, {
+  const forbiddenHistory = await fetch(`${baseUrl}/api/v1/history/${garage._id}?hours=24`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(forbiddenHistory.status, 403);
   assert.equal(contracts.parseErrorResponse(await forbiddenHistory.json()).code, 'FORBIDDEN_GROUP');
 
-  const forbiddenCreate = await fetch(`${baseUrl}/api/locations`, {
+  const forbiddenCreate = await fetch(`${baseUrl}/api/v1/locations`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -108,4 +112,10 @@ test('API auth and access rules are enforced', async t => {
   });
   assert.equal(forbiddenCreate.status, 403);
   assert.equal(contracts.parseErrorResponse(await forbiddenCreate.json()).code, 'FORBIDDEN_GROUP');
+
+  const legacyMe = await fetch(`${baseUrl}/api/me`, {
+    headers: { cookie: adminLogin.cookie },
+  });
+  assert.equal(legacyMe.status, 200);
+  contracts.parseMeResponse(await legacyMe.json());
 });

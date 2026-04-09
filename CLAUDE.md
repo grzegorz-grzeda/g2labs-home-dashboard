@@ -46,6 +46,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
 - Preserve the shared contract layer in `shared/contracts/` when changing API request/response shapes.
 - Preserve `docs/API.md` as the human-readable API contract. If API behavior changes, update it in the same change.
+- Treat `/api/v1` as the canonical API prefix. Keep the unversioned `/api` alias working unless the change intentionally removes that compatibility layer.
 - Preserve the admin Access Management UI when changing user context, groups, or location assignment flows.
 - Keep the React SPA buildable through Vite and compatible with Express serving the built assets from `frontend-dist/`.
 

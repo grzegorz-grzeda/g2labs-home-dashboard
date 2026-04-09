@@ -4,9 +4,17 @@ This document describes the HTTP contract exposed by the dashboard backend.
 
 The source of truth for payload parsing lives in [shared/contracts/index.js](../shared/contracts/index.js). If an endpoint, request body, response body, or error code changes, update this file in the same change.
 
+## Version
+
+- Current API version: `v1`
+- Canonical route prefix: `/api/v1`
+- Compatibility alias: `/api`
+
+New clients should use `/api/v1`. The unversioned `/api` prefix is currently kept as a backward-compatible alias for the existing frontend and any older callers.
+
 ## Conventions
 
-- All API routes are rooted at `/api`.
+- All API routes are rooted at `/api/v1`.
 - All responses are JSON.
 - All routes except `POST /api/auth/login` and `POST /api/auth/logout` require an authenticated session cookie.
 - Error responses use a shared envelope:
@@ -37,7 +45,7 @@ The source of truth for payload parsing lives in [shared/contracts/index.js](../
 
 ## Authentication
 
-### `POST /api/auth/login`
+### `POST /api/v1/auth/login`
 
 Authenticates a user and sets an HTTP-only signed session cookie.
 
@@ -76,7 +84,7 @@ Common errors:
 - `400 INVALID_REQUEST`
 - `401 INVALID_CREDENTIALS`
 
-### `POST /api/auth/logout`
+### `POST /api/v1/auth/logout`
 
 Clears the current session cookie.
 
@@ -88,7 +96,7 @@ Success `200`:
 }
 ```
 
-### `GET /api/me`
+### `GET /api/v1/me`
 
 Returns the authenticated user context resolved from the session cookie.
 
@@ -121,7 +129,7 @@ Common errors:
 
 ## Readings
 
-### `GET /api/current`
+### `GET /api/v1/current`
 
 Returns the latest visible reading per visible location for the current user.
 
@@ -153,7 +161,7 @@ Common errors:
 - `401 AUTH_REQUIRED`
 - `403 FORBIDDEN_GROUP`
 
-### `GET /api/history/:locationId`
+### `GET /api/v1/history/:locationId`
 
 Returns time-bucketed history for one visible location.
 
@@ -182,7 +190,7 @@ Common errors:
 
 ## Locations
 
-### `GET /api/locations`
+### `GET /api/v1/locations`
 
 Returns all locations visible to the current user.
 
@@ -204,7 +212,7 @@ Common errors:
 
 - `401 AUTH_REQUIRED`
 
-### `POST /api/locations`
+### `POST /api/v1/locations`
 
 Creates a location in a group visible to the current user.
 
@@ -237,7 +245,7 @@ Common errors:
 - `403 FORBIDDEN_GROUP`
 - `409 DUPLICATE_SENSOR_MAC`
 
-### `PUT /api/locations/:id`
+### `PUT /api/v1/locations/:id`
 
 Updates one visible location. Any subset of the documented fields may be sent.
 
@@ -271,7 +279,7 @@ Common errors:
 - `404 NOT_FOUND`
 - `409 DUPLICATE_SENSOR_MAC`
 
-### `DELETE /api/locations/:id`
+### `DELETE /api/v1/locations/:id`
 
 Deletes one visible location and its readings.
 
@@ -291,9 +299,9 @@ Common errors:
 
 ## Admin
 
-All `/api/admin/*` routes require an authenticated admin user.
+All `/api/v1/admin/*` routes require an authenticated admin user.
 
-### `GET /api/admin/access`
+### `GET /api/v1/admin/access`
 
 Returns the current access-management view: all groups and all users.
 
@@ -331,7 +339,7 @@ Common errors:
 - `401 AUTH_REQUIRED`
 - `403 FORBIDDEN_ADMIN`
 
-### `POST /api/admin/groups`
+### `POST /api/v1/admin/groups`
 
 Creates a new group.
 
@@ -361,7 +369,7 @@ Common errors:
 - `403 FORBIDDEN_ADMIN`
 - `409 DUPLICATE_GROUP`
 
-### `POST /api/admin/users`
+### `POST /api/v1/admin/users`
 
 Creates a new user.
 
@@ -402,7 +410,7 @@ Common errors:
 - `403 FORBIDDEN_ADMIN`
 - `409 DUPLICATE_USERNAME`
 
-### `PUT /api/admin/users/:id`
+### `PUT /api/v1/admin/users/:id`
 
 Updates an existing user. Any subset of the fields below may be sent.
 

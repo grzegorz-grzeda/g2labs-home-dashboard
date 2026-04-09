@@ -12,8 +12,10 @@ import {
   parseUserWithGroups,
 } from '../../shared/contracts/frontend.mjs';
 
+const API_BASE = '/api/v1';
+
 async function request(path, options = {}) {
-  const response = await fetch(path, { ...options, credentials: 'same-origin' });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, credentials: 'same-origin' });
   const isJson = response.headers.get('content-type')?.includes('application/json');
   const body = isJson ? await response.json() : null;
 
@@ -26,7 +28,7 @@ async function request(path, options = {}) {
 }
 
 export async function login(credentials) {
-  return parseLoginResponse(await request('/api/auth/login', {
+  return parseLoginResponse(await request('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
@@ -34,23 +36,23 @@ export async function login(credentials) {
 }
 
 export async function logout() {
-  return parseOkResponse(await request('/api/auth/logout', { method: 'POST' }));
+  return parseOkResponse(await request('/auth/logout', { method: 'POST' }));
 }
 
 export async function getMe() {
-  return parseMeResponse(await request('/api/me'));
+  return parseMeResponse(await request('/me'));
 }
 
 export async function getCurrentReadings() {
-  return parseCurrentReadingsResponse(await request('/api/current'));
+  return parseCurrentReadingsResponse(await request('/current'));
 }
 
 export async function getLocations() {
-  return parseLocationsResponse(await request('/api/locations'));
+  return parseLocationsResponse(await request('/locations'));
 }
 
 export async function createLocation(payload) {
-  return parseLocation(await request('/api/locations', {
+  return parseLocation(await request('/locations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -58,7 +60,7 @@ export async function createLocation(payload) {
 }
 
 export async function updateLocation(id, payload) {
-  return parseLocation(await request(`/api/locations/${id}`, {
+  return parseLocation(await request(`/locations/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -66,19 +68,19 @@ export async function updateLocation(id, payload) {
 }
 
 export async function deleteLocation(id) {
-  return parseOkResponse(await request(`/api/locations/${id}`, { method: 'DELETE' }));
+  return parseOkResponse(await request(`/locations/${id}`, { method: 'DELETE' }));
 }
 
 export async function getHistory(locationId, hours) {
-  return parseHistoryResponse(await request(`/api/history/${locationId}?hours=${hours}`));
+  return parseHistoryResponse(await request(`/history/${locationId}?hours=${hours}`));
 }
 
 export async function getAdminAccess() {
-  return parseAdminAccessResponse(await request('/api/admin/access'));
+  return parseAdminAccessResponse(await request('/admin/access'));
 }
 
 export async function createGroup(payload) {
-  return parseGroup(await request('/api/admin/groups', {
+  return parseGroup(await request('/admin/groups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -86,7 +88,7 @@ export async function createGroup(payload) {
 }
 
 export async function createUser(payload) {
-  return parseUserWithGroups(await request('/api/admin/users', {
+  return parseUserWithGroups(await request('/admin/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -94,7 +96,7 @@ export async function createUser(payload) {
 }
 
 export async function updateUser(id, payload) {
-  return parseUserWithGroups(await request(`/api/admin/users/${id}`, {
+  return parseUserWithGroups(await request(`/admin/users/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

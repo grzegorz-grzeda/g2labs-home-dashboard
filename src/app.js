@@ -18,6 +18,7 @@ const createReadingsRouter = require('./routes/readings');
 
 function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
   const app = express();
+  const apiRouter = express.Router();
   const clientDistPath = path.resolve(__dirname, '..', 'frontend-dist');
 
   app.use(express.static(clientDistPath, { index: false }));
@@ -36,7 +37,7 @@ function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
     }
   });
 
-  app.post('/api/auth/login', async (req, res) => {
+  apiRouter.post('/auth/login', async (req, res) => {
     let credentials;
     try {
       credentials = parseLoginRequest(req.body);
@@ -54,20 +55,20 @@ function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
     });
   });
 
-  app.post('/api/auth/logout', (req, res) => {
+  apiRouter.post('/auth/logout', (req, res) => {
     res.setHeader('Set-Cookie', serializeLogoutCookie());
     sendContract(res, { parser: parseOkResponse, body: { ok: true } });
   });
 
-  app.use('/api', (req, res, next) => {
+  apiRouter.use((req, res, next) => {
     if (!req.userContext) return sendError(res, 401, 'AUTH_REQUIRED', 'authentication required');
     next();
   });
 
-  app.use('/api/locations', createLocationsRouter({ db }));
-  app.use('/api/admin', createAdminRouter({ db }));
-  app.use('/api', createReadingsRouter({ db, chartBuckets }));
-  app.get('/api/me', async (req, res) => {
+  apiRouter.use('/locations', createLocationsRouter({ db }));
+  apiRouter.use('/admin', createAdminRouter({ db }));
+  apiRouter.use('/', createReadingsRouter({ db, chartBuckets }));
+  apiRouter.get('/me', async (req, res) => {
     sendContract(res, {
       parser: parseMeResponse,
       body: {
@@ -77,6 +78,9 @@ function createApp({ db, chartBuckets, sessionSecret, allowUserOverride }) {
       },
     });
   });
+
+  app.use('/api/v1', apiRouter);
+  app.use('/api', apiRouter);
 
   app.use((err, req, res, next) => {
     if (err && err.code === 'USER_NOT_FOUND') return sendError(res, 401, 'USER_NOT_FOUND', 'unknown user context');

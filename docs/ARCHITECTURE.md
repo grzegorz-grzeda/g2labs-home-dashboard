@@ -148,6 +148,8 @@ The project uses shared contract parsers in `shared/contracts/`. Routes validate
 
 `docs/API.md` is the human-readable companion to that contract layer and must be kept in sync when endpoints, payloads, auth rules, or error codes change.
 
+The canonical HTTP prefix is `/api/v1`. The backend currently also mounts the same router under `/api` as a backward-compatible alias so versioning can be introduced without breaking existing callers.
+
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.
 

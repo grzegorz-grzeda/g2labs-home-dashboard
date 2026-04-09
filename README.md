@@ -121,6 +121,14 @@ The browser UI now lives in a dedicated React/Vite project:
 - Express serves the compiled frontend from `frontend-dist/`
 - [docs/API.md](docs/API.md) documents the HTTP contract used between the React app and the backend
 
+## Versioning
+
+- The application version follows SemVer from [package.json](package.json).
+- The current HTTP contract is API `v1`.
+- New frontend and external clients should call `/api/v1/*`.
+- The legacy `/api/*` prefix is still accepted as a backward-compatible alias while the versioned API settles.
+- Any breaking API contract change should introduce a new API version and update [docs/API.md](docs/API.md) in the same change.
+
 Current coverage includes:
 
 - API-level authentication and authorization responses
@@ -140,6 +148,7 @@ Locations belong to a single group. Users can belong to one or more groups. A us
 The current implementation uses local username/password authentication with signed cookie sessions:
 
 - `POST /api/auth/login` verifies credentials and sets an HTTP-only session cookie
+- the canonical API prefix is `/api/v1`, with `/api` kept as a compatibility alias
 - HTTP requests resolve the current user from that cookie
 - Socket.io connections resolve the current user from the same cookie during the handshake
 - `ALLOW_USER_OVERRIDE=true` can still be used in test mode for request/socket debugging
