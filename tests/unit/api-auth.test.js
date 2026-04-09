@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 
+const contracts = require('../../shared/contracts');
 const { createApp } = require('../../src/app');
 const { createMockDb } = require('../../src/adapters/db/mock');
 
@@ -49,45 +50,49 @@ test('API auth and access rules are enforced', async t => {
 
   const unauthenticatedCurrent = await fetch(`${baseUrl}/api/current`);
   assert.equal(unauthenticatedCurrent.status, 401);
+  assert.equal(contracts.parseErrorResponse(await unauthenticatedCurrent.json()).code, 'AUTH_REQUIRED');
 
   const adminLogin = await login(baseUrl, 'grzegorz', 'grzegorz');
   assert.equal(adminLogin.response.status, 200);
-  assert.equal(adminLogin.body.user.role, 'admin');
+  assert.equal(contracts.parseLoginResponse(adminLogin.body).user.role, 'admin');
   assert.ok(adminLogin.cookie);
 
   const adminAccess = await fetch(`${baseUrl}/api/admin/access`, {
     headers: { cookie: adminLogin.cookie },
   });
   assert.equal(adminAccess.status, 200);
+  contracts.parseAdminAccessResponse(await adminAccess.json());
 
   const adminLocations = await fetch(`${baseUrl}/api/locations`, {
     headers: { cookie: adminLogin.cookie },
   });
-  const locations = await adminLocations.json();
+  const locations = contracts.parseLocationsResponse(await adminLocations.json());
   const garage = locations.find(location => location.name === 'Garage');
   assert.ok(garage);
 
   const memberLogin = await login(baseUrl, 'anna', 'anna');
   assert.equal(memberLogin.response.status, 200);
-  assert.equal(memberLogin.body.user.role, 'member');
+  assert.equal(contracts.parseLoginResponse(memberLogin.body).user.role, 'member');
   assert.ok(memberLogin.cookie);
 
   const memberLocationsResponse = await fetch(`${baseUrl}/api/locations`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(memberLocationsResponse.status, 200);
-  const memberLocations = await memberLocationsResponse.json();
+  const memberLocations = contracts.parseLocationsResponse(await memberLocationsResponse.json());
   assert.equal(memberLocations.some(location => location.name === 'Garage'), false);
 
   const memberAdminAccess = await fetch(`${baseUrl}/api/admin/access`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(memberAdminAccess.status, 403);
+  assert.equal(contracts.parseErrorResponse(await memberAdminAccess.json()).code, 'FORBIDDEN_ADMIN');
 
   const forbiddenHistory = await fetch(`${baseUrl}/api/history/${garage._id}?hours=24`, {
     headers: { cookie: memberLogin.cookie },
   });
   assert.equal(forbiddenHistory.status, 403);
+  assert.equal(contracts.parseErrorResponse(await forbiddenHistory.json()).code, 'FORBIDDEN_GROUP');
 
   const forbiddenCreate = await fetch(`${baseUrl}/api/locations`, {
     method: 'POST',
@@ -102,4 +107,5 @@ test('API auth and access rules are enforced', async t => {
     }),
   });
   assert.equal(forbiddenCreate.status, 403);
+  assert.equal(contracts.parseErrorResponse(await forbiddenCreate.json()).code, 'FORBIDDEN_GROUP');
 });

@@ -142,6 +142,9 @@ The test suite includes direct HTTP integration coverage for `401` and `403` acc
 ### Frontend: React SPA built with Vite
 The browser UI is now a dedicated React application under `frontend/`. Express serves the compiled assets from `frontend-dist/`, which is produced by `npm run build:client`. This keeps the backend API and Socket.io wiring unchanged while giving the frontend proper component/state structure.
 
+### API contract: shared parsers between frontend and backend
+The project uses shared contract parsers in `shared/contracts/`. Routes validate incoming request bodies and validate outgoing response shapes before sending JSON. The React frontend consumes the same contract layer through a small API client, which keeps both sides aligned on payload structure and error codes.
+
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.
 

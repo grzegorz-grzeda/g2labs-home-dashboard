@@ -43,6 +43,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Users authenticate with username/password and a signed cookie-backed session.
 - Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
 - Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
+- Preserve the shared contract layer in `shared/contracts/` when changing API request/response shapes.
 - Preserve the admin Access Management UI when changing user context, groups, or location assignment flows.
 - Keep the React SPA buildable through Vite and compatible with Express serving the built assets from `frontend-dist/`.
 

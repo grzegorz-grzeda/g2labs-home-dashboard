@@ -123,6 +123,7 @@ The browser UI now lives in a dedicated React/Vite project:
 Current coverage includes:
 
 - API-level authentication and authorization responses
+- shared contract validation for key API request/response shapes
 - dashboard smoke test for seeded cards and charts
 - login flow with persisted authenticated sessions
 - clock format toggle behavior

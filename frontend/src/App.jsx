@@ -2,6 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
+import {
+  createGroup,
+  createLocation,
+  createUser,
+  deleteLocation,
+  getAdminAccess,
+  getCurrentReadings,
+  getHistory,
+  getLocations,
+  getMe,
+  login,
+  logout,
+  updateLocation,
+  updateUser,
+} from './api';
 
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -236,17 +251,15 @@ export default function App() {
     loadAllCharts();
   }, [authState, locations, rangeHours, timeFormat]);
 
-  async function apiFetch(path, options = {}) {
-    return fetch(path, { ...options, credentials: 'same-origin' });
-  }
-
   async function loadUserContext() {
-    const response = await apiFetch('/api/me');
-    if (response.status === 401) return false;
-    if (!response.ok) throw new Error(`Failed to load user context (${response.status})`);
-    const context = await response.json();
-    await applyAuthenticatedContext(context);
-    return true;
+    try {
+      const context = await getMe();
+      await applyAuthenticatedContext(context);
+      return true;
+    } catch (error) {
+      if (error?.code === 'AUTH_REQUIRED' || error?.code === 'USER_NOT_FOUND') return false;
+      throw new Error(error.error || error.message || 'Failed to load user context');
+    }
   }
 
   async function applyAuthenticatedContext(context) {
@@ -259,13 +272,10 @@ export default function App() {
     }));
     if (context.user.role === 'admin') {
       try {
-        const response = await apiFetch('/api/admin/access');
-        if (!response.ok) throw new Error(`Failed to load access management (${response.status})`);
-        const access = await response.json();
-        setAccessData(access);
+        setAccessData(await getAdminAccess());
       } catch (error) {
         console.error('Failed to load admin access UI:', error);
-        setAccessError(error.message || 'Failed to load access management');
+        setAccessError(error.error || error.message || 'Failed to load access management');
       }
     } else {
       setAccessData({ groups: [], users: [] });
@@ -278,9 +288,7 @@ export default function App() {
     setCurrentReadings({});
     setHistoriesByLocation({});
     await loadLocations();
-    const currentResponse = await apiFetch('/api/current');
-    if (!currentResponse.ok) throw new Error(`Failed to load current readings (${currentResponse.status})`);
-    const current = await currentResponse.json();
+    const current = await getCurrentReadings();
     const nextReadings = {};
     current.forEach(({ location, reading }) => {
       if (reading) {
@@ -295,9 +303,7 @@ export default function App() {
   }
 
   async function loadLocations() {
-    const response = await apiFetch('/api/locations');
-    if (!response.ok) throw new Error(`Failed to load locations (${response.status})`);
-    const nextLocations = await response.json();
+    const nextLocations = await getLocations();
     setLocations(nextLocations);
     setLocationDraft(draft => ({
       ...draft,
@@ -306,10 +312,9 @@ export default function App() {
   }
 
   async function loadAllCharts() {
-    const responses = await Promise.all(
-      locations.map(location => apiFetch(`/api/history/${location._id}?hours=${rangeHours}`))
+    const histories = await Promise.all(
+      locations.map(location => getHistory(location._id, rangeHours))
     );
-    const histories = await Promise.all(responses.map(response => response.json()));
     const next = {};
     locations.forEach((location, index) => {
       next[location._id] = histories[index];
@@ -356,28 +361,19 @@ export default function App() {
   async function handleLogin(event) {
     event.preventDefault();
     try {
-      const response = await apiFetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm),
-      });
-      if (!response.ok) {
-        setAuthError((await response.json()).error);
-        return;
-      }
-      const context = await response.json();
+      const context = await login(authForm);
       setAuthForm(form => ({ ...form, password: '' }));
       await applyAuthenticatedContext(context);
       await reloadDashboard();
     } catch (error) {
       console.error('Login flow failed:', error);
-      setAuthError(error.message || 'Login failed');
+      setAuthError(error.error || error.message || 'Login failed');
     }
   }
 
   async function handleLogout() {
     socketRef.current?.disconnect();
-    await apiFetch('/api/auth/logout', { method: 'POST' });
+    await logout();
     setAuthState('logged-out');
     setCurrentUserContext(null);
     setLocations([]);
@@ -388,71 +384,59 @@ export default function App() {
   }
 
   async function handleAddLocation() {
-    const response = await apiFetch('/api/locations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(locationDraft),
-    });
-    if (!response.ok) {
-      setLocationsError((await response.json()).error);
-      return;
+    try {
+      await createLocation(locationDraft);
+      setLocationsError('');
+      setLocationDraft(draft => ({ ...draft, name: '', sensorMac: '' }));
+      await loadLocations();
+    } catch (error) {
+      setLocationsError(error.error || error.message);
     }
-    setLocationsError('');
-    setLocationDraft(draft => ({ ...draft, name: '', sensorMac: '' }));
-    await loadLocations();
   }
 
   async function handleSaveLocation(id) {
     const draft = editLocationDrafts[id];
-    const response = await apiFetch(`/api/locations/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(draft),
-    });
-    if (!response.ok) {
-      setLocationsError((await response.json()).error);
-      return;
+    try {
+      await updateLocation(id, draft);
+      setLocationsError('');
+      setEditingLocationId(null);
+      await loadLocations();
+    } catch (error) {
+      setLocationsError(error.error || error.message);
     }
-    setLocationsError('');
-    setEditingLocationId(null);
-    await loadLocations();
   }
 
   async function handleDeleteLocation(id) {
     if (!window.confirm('Delete this location and all its readings?')) return;
-    await apiFetch(`/api/locations/${id}`, { method: 'DELETE' });
-    await loadLocations();
+    try {
+      await deleteLocation(id);
+      await loadLocations();
+    } catch (error) {
+      setLocationsError(error.error || error.message);
+    }
   }
 
   async function handleCreateGroup() {
-    const response = await apiFetch('/api/admin/groups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newGroupDraft),
-    });
-    if (!response.ok) {
-      setAccessError((await response.json()).error);
-      return;
+    try {
+      await createGroup(newGroupDraft);
+      setAccessError('');
+      setNewGroupDraft({ name: '', description: '' });
+      await loadUserContext();
+      await loadLocations();
+    } catch (error) {
+      setAccessError(error.error || error.message);
     }
-    setAccessError('');
-    setNewGroupDraft({ name: '', description: '' });
-    await loadUserContext();
-    await loadLocations();
   }
 
   async function handleCreateUser() {
-    const response = await apiFetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUserDraft),
-    });
-    if (!response.ok) {
-      setAccessError((await response.json()).error);
-      return;
+    try {
+      await createUser(newUserDraft);
+      setAccessError('');
+      setNewUserDraft({ name: '', username: '', password: '', role: 'member', groupIds: [] });
+      await loadUserContext();
+    } catch (error) {
+      setAccessError(error.error || error.message);
     }
-    setAccessError('');
-    setNewUserDraft({ name: '', username: '', password: '', role: 'member', groupIds: [] });
-    await loadUserContext();
   }
 
   async function handleSaveUser(userId, event) {
@@ -460,20 +444,18 @@ export default function App() {
     const role = row.querySelector('.user-role-input').value;
     const password = row.querySelector('.user-password-input').value;
     const groupIds = getSelectedValues(row.querySelector('.user-groups-input'));
-    const response = await apiFetch(`/api/admin/users/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, password, groupIds }),
-    });
-    if (!response.ok) {
-      setAccessError((await response.json()).error);
-      return;
+    try {
+      await updateUser(userId, { role, password, groupIds });
+      setAccessError('');
+      await loadUserContext();
+    } catch (error) {
+      setAccessError(error.error || error.message);
     }
-    setAccessError('');
-    await loadUserContext();
   }
 
-  const allHistoryPoints = Object.values(historiesByLocation).flat();
+  const allHistoryPoints = Object.values(historiesByLocation)
+    .flat()
+    .filter(point => typeof point.temperature === 'number' && typeof point.humidity === 'number');
   const scales = allHistoryPoints.length > 0 ? {
     tempMin: Math.floor(Math.min(...allHistoryPoints.map(point => point.temperature))) - 5,
     tempMax: Math.ceil(Math.max(...allHistoryPoints.map(point => point.temperature))) + 5,

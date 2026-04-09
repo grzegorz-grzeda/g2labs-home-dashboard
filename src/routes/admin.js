@@ -1,5 +1,14 @@
 const express = require('express');
+const {
+  parseAdminAccessResponse,
+  parseCreateGroupRequest,
+  parseCreateUserRequest,
+  parseGroup,
+  parseUpdateUserRequest,
+  parseUserWithGroups,
+} = require('../../shared/contracts');
 const { asyncHandler } = require('./async-handler');
+const { sendContract, sendError } = require('./contract-response');
 
 function isDuplicateUsernameError(err) {
   return err && err.code === 11000;
@@ -22,60 +31,66 @@ function createAdminRouter({ db }) {
         db.listGroups(req.userContext),
         db.listUsers(req.userContext),
       ]);
-      res.json({ groups, users });
+      sendContract(res, {
+        parser: parseAdminAccessResponse,
+        body: { groups, users },
+      });
     } catch (err) {
-      if (isForbiddenAdminError(err)) return res.status(403).json({ error: 'admin access required' });
+      if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
       throw err;
     }
   }));
 
   router.post('/groups', asyncHandler(async (req, res) => {
-    const { name, description = '' } = req.body;
-    if (!name) return res.status(400).json({ error: 'group name required' });
+    let payload;
+    try {
+      payload = parseCreateGroupRequest(req.body);
+    } catch {
+      return sendError(res, 400, 'INVALID_REQUEST', 'group name required');
+    }
 
     try {
-      const group = await db.createGroup(req.userContext, { name, description });
-      res.status(201).json(group);
+      const group = await db.createGroup(req.userContext, payload);
+      sendContract(res, { status: 201, parser: parseGroup, body: group });
     } catch (err) {
-      if (isForbiddenAdminError(err)) return res.status(403).json({ error: 'admin access required' });
-      if (isDuplicateGroupError(err)) return res.status(409).json({ error: 'group name already exists' });
+      if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
+      if (isDuplicateGroupError(err)) return sendError(res, 409, 'DUPLICATE_GROUP', 'group name already exists');
       throw err;
     }
   }));
 
   router.post('/users', asyncHandler(async (req, res) => {
-    const { name, username, password, role = 'member', groupIds = [] } = req.body;
-    if (!name || !username || !password) return res.status(400).json({ error: 'name, username, and password required' });
-    if (!Array.isArray(groupIds) || groupIds.length === 0) return res.status(400).json({ error: 'at least one group required' });
+    let payload;
+    try {
+      payload = parseCreateUserRequest(req.body);
+    } catch (err) {
+      return sendError(res, 400, 'INVALID_REQUEST', err.message);
+    }
 
     try {
-      const user = await db.createUser(req.userContext, { name, username, password, role, groupIds });
-      res.status(201).json(user);
+      const user = await db.createUser(req.userContext, payload);
+      sendContract(res, { status: 201, parser: parseUserWithGroups, body: user });
     } catch (err) {
-      if (isForbiddenAdminError(err)) return res.status(403).json({ error: 'admin access required' });
-      if (isDuplicateUsernameError(err)) return res.status(409).json({ error: 'username already exists' });
+      if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
+      if (isDuplicateUsernameError(err)) return sendError(res, 409, 'DUPLICATE_USERNAME', 'username already exists');
       throw err;
     }
   }));
 
   router.put('/users/:id', asyncHandler(async (req, res) => {
-    const update = {};
-    if (req.body.name) update.name = req.body.name;
-    if (req.body.role) update.role = req.body.role;
-    if (req.body.password) update.password = req.body.password;
-    if (req.body.groupIds) {
-      if (!Array.isArray(req.body.groupIds) || req.body.groupIds.length === 0) {
-        return res.status(400).json({ error: 'at least one group required' });
-      }
-      update.groupIds = req.body.groupIds;
+    let update;
+    try {
+      update = parseUpdateUserRequest(req.body);
+    } catch (err) {
+      return sendError(res, 400, 'INVALID_REQUEST', err.message);
     }
 
     try {
       const user = await db.updateUser(req.userContext, req.params.id, update);
-      if (!user) return res.status(404).json({ error: 'not found' });
-      res.json(user);
+      if (!user) return sendError(res, 404, 'NOT_FOUND', 'not found');
+      sendContract(res, { parser: parseUserWithGroups, body: user });
     } catch (err) {
-      if (isForbiddenAdminError(err)) return res.status(403).json({ error: 'admin access required' });
+      if (isForbiddenAdminError(err)) return sendError(res, 403, 'FORBIDDEN_ADMIN', 'admin access required');
       throw err;
     }
   }));

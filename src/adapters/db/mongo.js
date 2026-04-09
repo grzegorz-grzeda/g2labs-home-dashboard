@@ -243,14 +243,25 @@ function createMongoDb({ connectionString, defaultAdminPassword, defaultUserPass
 
     async createUser(userContext, { name, username, password, role = 'member', groupIds }) {
       ensureAdmin(userContext);
-      const user = await User.create({
+      const createdUser = await User.create({
         name: name.trim(),
         username: username.trim(),
         passwordHash: hashPassword(password),
         role,
         groupIds,
       });
-      return serializeUser(user, extractGroupIds(groupIds));
+      const user = await User.findById(createdUser._id).populate('groupIds').lean();
+      return {
+        _id: user._id.toString(),
+        name: user.name,
+        username: user.username,
+        role: user.role || 'member',
+        groupIds: extractGroupIds(user.groupIds),
+        groups: (user.groupIds || []).map(group => ({
+          _id: group._id ? group._id.toString() : group.toString(),
+          name: group.name || '',
+        })),
+      };
     },
 
     async updateUser(userContext, id, update) {
