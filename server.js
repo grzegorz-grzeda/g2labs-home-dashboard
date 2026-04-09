@@ -3,10 +3,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
-const Reading = require('./models/Reading');
 const Location = require('./models/Location');
+const Reading = require('./models/Reading');
 const locationsRouter = require('./routes/locations');
 const MqttSubscriber = require('./mqtt/subscriber');
+const { handleReading } = require('./services/readings');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,37 +23,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/home-dash
   .catch(err => console.error('MongoDB error:', err));
 
 // MQTT
-const DEDUP_WINDOW_SECONDS = 10;
-
 const subscriber = new MqttSubscriber({
   broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883',
   topic:  process.env.MQTT_TOPIC  || 'atc',
 });
 
-subscriber.on('reading', async ({ address, rssi, temperature, humidity, battery, frameCounter }) => {
-  const location = await Location.findOne({ sensorMac: address });
-  if (!location) return;
-
-  const dedupSince = new Date(Date.now() - DEDUP_WINDOW_SECONDS * 1000);
-  const exists = await Reading.exists({
-    locationId: location._id,
-    frameCounter,
-    timestamp: { $gte: dedupSince },
-  });
-  if (exists) return;
-
-  await Reading.create({ locationId: location._id, temperature, humidity, battery, rssi, frameCounter });
-
-  io.emit('reading', {
-    locationId:   location._id.toString(),
-    locationName: location.name,
-    temperature,
-    humidity,
-    battery,
-    rssi,
-    timestamp: new Date(),
-  });
-});
+subscriber.on('reading', reading => handleReading(reading, io));
 
 // REST API
 
