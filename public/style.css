@@ -96,6 +96,15 @@ section { margin-bottom: 2.5rem; }
   color: var(--text);
 }
 
+.time-format-toggle {
+  margin-left: 0;
+}
+
+.time-format-toggle button {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.7rem;
+}
+
 /* ── Badge ───────────────────────────────────────────────────────────────── */
 .badge {
   padding: 0.25rem 0.75rem;

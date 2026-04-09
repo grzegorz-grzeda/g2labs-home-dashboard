@@ -20,22 +20,76 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+function getTimeFormatOptions() {
+  const timeFormat = localStorage.getItem('time-format') || 'system';
+  if (timeFormat === '24h') return { hour12: false };
+  if (timeFormat === '12h') return { hour12: true };
+  return {};
+}
+
+function formatWithLocalSettings(ts, options) {
+  return new Date(ts).toLocaleString(undefined, {
+    ...options,
+    ...getTimeFormatOptions(),
+  });
+}
+
+function formatLocalDateTime(ts) {
+  return formatWithLocalSettings(ts, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function formatChartTime(ts) {
+  return formatWithLocalSettings(ts, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('theme', theme);
-  document.querySelectorAll('.theme-toggle button').forEach(btn => {
+  document.querySelectorAll('#theme-toggle button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
   // Rebuild charts so Chart.js picks up new colors
   if (Object.keys(locationsMap).length > 0) loadAllCharts();
 }
 
-document.querySelectorAll('.theme-toggle button').forEach(btn => {
+document.querySelectorAll('#theme-toggle button').forEach(btn => {
   btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
 });
 
 // Restore saved preference (default: system)
 applyTheme(localStorage.getItem('theme') || 'system');
+
+function refreshVisibleTimes() {
+  document.querySelectorAll('.updated-at[data-timestamp]').forEach(el => {
+    el.textContent = formatTime(el.dataset.timestamp);
+  });
+  if (Object.keys(locationsMap).length > 0) loadAllCharts();
+}
+
+function applyTimeFormat(timeFormat) {
+  localStorage.setItem('time-format', timeFormat);
+  document.querySelectorAll('.time-format-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.timeFormat === timeFormat);
+  });
+  refreshVisibleTimes();
+}
+
+document.querySelectorAll('.time-format-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => applyTimeFormat(btn.dataset.timeFormat));
+});
+
+applyTimeFormat(localStorage.getItem('time-format') || 'system');
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 socket.on('connect', () => {
@@ -82,7 +136,7 @@ function upsertCard({ locationId, locationName, temperature, humidity, battery, 
           <div class="unit">% bat</div>
         </div>` : ''}
       </div>
-      <div class="updated-at" data-field="timestamp">${formatTime(timestamp)}</div>
+      <div class="updated-at" data-field="timestamp" data-timestamp="${timestamp}">${formatTime(timestamp)}</div>
     `;
     cardsContainer.appendChild(card);
     cards[locationId] = card;
@@ -92,7 +146,9 @@ function upsertCard({ locationId, locationName, temperature, humidity, battery, 
     card.querySelector('[data-field="humidity"]').textContent = humidity;
     const bEl = card.querySelector('[data-field="battery"]');
     if (bEl && battery != null) bEl.textContent = battery;
-    card.querySelector('[data-field="timestamp"]').textContent = formatTime(timestamp);
+    const timestampEl = card.querySelector('[data-field="timestamp"]');
+    timestampEl.dataset.timestamp = timestamp;
+    timestampEl.textContent = formatTime(timestamp);
     card.classList.add('updated');
     setTimeout(() => card.classList.remove('updated'), 1500);
   }
@@ -185,6 +241,7 @@ function buildChart(canvasId, readings, scales) {
           titleColor: textColor,
           bodyColor: cssVar('--text'),
           callbacks: {
+            title: items => items[0] ? formatChartTime(items[0].parsed.x) : '',
             label: ctx => {
               const unit = ctx.datasetIndex === 0 ? '°C' : '%';
               return ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} ${unit}`;
@@ -197,7 +254,11 @@ function buildChart(canvasId, readings, scales) {
           type: 'time',
           time: { tooltipFormat: 'MMM d, HH:mm' },
           grid: { color: gridColor },
-          ticks: { color: mutedColor, maxTicksLimit: 8 },
+          ticks: {
+            color: mutedColor,
+            maxTicksLimit: 8,
+            callback: value => formatChartTime(value),
+          },
         },
         yTemp: {
           position: 'left',
@@ -363,10 +424,7 @@ function setError(msg) { locationsError.textContent = msg; }
 
 function formatTime(ts) {
   if (!ts) return '';
-  return new Date(ts).toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
+  return formatLocalDateTime(ts);
 }
 
 init();
