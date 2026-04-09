@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,6 +13,11 @@
   <header>
     <h1>Home Dashboard</h1>
     <div id="connection-status" class="badge disconnected">Disconnected</div>
+    <div id="theme-toggle" class="theme-toggle" title="Toggle theme">
+      <button data-theme="light">☀</button>
+      <button data-theme="system">⬤</button>
+      <button data-theme="dark">☾</button>
+    </div>
   </header>
 
   <section id="current-readings">

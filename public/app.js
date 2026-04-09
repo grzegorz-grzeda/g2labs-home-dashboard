@@ -12,6 +12,30 @@ const cards = {};
 const charts = {};
 // { locationId -> location object }
 let locationsMap = {};
+// Current shared y-axis scales
+let currentScales = null;
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('theme', theme);
+  document.querySelectorAll('.theme-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+  // Rebuild charts so Chart.js picks up new colors
+  if (Object.keys(locationsMap).length > 0) loadAllCharts();
+}
+
+document.querySelectorAll('.theme-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
+});
+
+// Restore saved preference (default: system)
+applyTheme(localStorage.getItem('theme') || 'system');
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 socket.on('connect', () => {
@@ -114,6 +138,11 @@ function renderLocationChart(loc, readings, scales) {
 
 function buildChart(canvasId, readings, scales) {
   const pts = readings.length;
+  const gridColor   = cssVar('--border');
+  const mutedColor  = cssVar('--text-faint');
+  const surfaceColor = cssVar('--surface');
+  const textColor   = cssVar('--text-muted');
+
   return new Chart(document.getElementById(canvasId), {
     type: 'line',
     data: {
@@ -148,13 +177,13 @@ function buildChart(canvasId, readings, scales) {
       animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, labels: { color: '#9ca3af', boxWidth: 12 } },
+        legend: { display: true, labels: { color: textColor, boxWidth: 12 } },
         tooltip: {
-          backgroundColor: '#1c1f2e',
-          borderColor: '#2d3148',
+          backgroundColor: surfaceColor,
+          borderColor: gridColor,
           borderWidth: 1,
-          titleColor: '#9ca3af',
-          bodyColor: '#e0e0e0',
+          titleColor: textColor,
+          bodyColor: cssVar('--text'),
           callbacks: {
             label: ctx => {
               const unit = ctx.datasetIndex === 0 ? '°C' : '%';
@@ -167,14 +196,14 @@ function buildChart(canvasId, readings, scales) {
         x: {
           type: 'time',
           time: { tooltipFormat: 'MMM d, HH:mm' },
-          grid: { color: '#2d3148' },
-          ticks: { color: '#6b7280', maxTicksLimit: 8 },
+          grid: { color: gridColor },
+          ticks: { color: mutedColor, maxTicksLimit: 8 },
         },
         yTemp: {
           position: 'left',
           min: scales?.tempMin,
           max: scales?.tempMax,
-          grid: { color: '#2d3148' },
+          grid: { color: gridColor },
           ticks: { color: '#f97316', callback: v => `${v} °C` },
         },
         yHumid: {
@@ -188,9 +217,6 @@ function buildChart(canvasId, readings, scales) {
     },
   });
 }
-
-// Current shared scales (updated whenever a reading falls outside)
-let currentScales = null;
 
 function appendToChart(reading) {
   const chart = charts[reading.locationId];
