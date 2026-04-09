@@ -12,6 +12,7 @@ async function waitForDashboard(page) {
   await expect(page.getByRole('heading', { name: 'Home Dashboard' })).toBeVisible();
   await expect(page.locator('#dashboard-shell')).toBeVisible();
   await expect(page.locator('#auth-shell')).toBeHidden();
+  await expect(page.locator('#nav-dashboard')).toHaveClass(/active/);
   await expect(page.locator('#cards-container .card')).toHaveCount(4);
   await expect(page.locator('#charts-container .chart-box')).toHaveCount(4);
 }
@@ -52,6 +53,9 @@ test('clock format toggle updates visible timestamp formatting', async ({ page }
 test('locations CRUD works against the mock db', async ({ page }) => {
   await login(page, 'grzegorz', 'grzegorz');
   await waitForDashboard(page);
+  await page.locator('#nav-locations').click();
+  await expect(page.locator('#nav-locations')).toHaveClass(/active/);
+  await expect(page.locator('#locations-table')).toBeVisible();
 
   const newName = 'Office';
   const newMac = 'AA:BB:CC:DD:EE:99';
@@ -81,29 +85,39 @@ test('switching users filters locations by group access', async ({ page }) => {
   await expect(page.locator('#cards-container .card')).toHaveCount(3);
   await expect(page.locator('#charts-container .chart-box')).toHaveCount(3);
   await expect(page.locator('#cards-container')).not.toContainText('Garage');
+  await page.locator('#nav-locations').click();
   await expect(page.locator('#locations-tbody')).not.toContainText('Garage');
   await expect(page.locator('#user-role')).toHaveText('Member');
   await expect(page.locator('#group-summary')).toHaveText('Family');
-  await expect(page.locator('#access-section')).toBeHidden();
+  await expect(page.locator('#nav-access')).toHaveCount(0);
 });
 
 test('admin can manage groups and user memberships', async ({ page }) => {
   await login(page, 'grzegorz', 'grzegorz');
   await waitForDashboard(page);
+  await page.locator('#nav-access').click();
+  await expect(page.locator('#nav-access')).toHaveClass(/active/);
+  await expect(page.locator('#access-section')).toBeVisible();
 
   await page.locator('#group-name').fill('Attic');
   await page.locator('#group-description').fill('Top floor sensors');
   await page.getByRole('button', { name: 'Create Group' }).click();
 
   await expect(page.locator('#groups-list')).toContainText('Attic');
+  await page.locator('#nav-locations').click();
+  await expect(page.locator('#nav-locations')).toHaveClass(/active/);
   await expect(page.locator('#new-group')).toContainText('Attic');
+
+  await page.locator('#nav-access').click();
+  await expect(page.locator('#nav-access')).toHaveClass(/active/);
 
   await page.locator('#new-user-name').fill('Marek');
   await page.locator('#new-user-username').fill('marek');
   await page.locator('#new-user-password').fill('marek');
   await page.locator('#new-user-role').selectOption('member');
   await page.locator('#new-user-groups').selectOption([{ label: 'Family' }]);
-  await page.getByRole('button', { name: 'Add User' }).click();
+  await page.locator('#add-user-btn').scrollIntoViewIfNeeded();
+  await page.locator('#add-user-btn').click();
 
   await expect(page.locator('#users-tbody')).toContainText('Marek');
 
@@ -126,6 +140,7 @@ test('mobile layout keeps the dashboard usable', async ({ page, isMobile }) => {
 
   await login(page, 'grzegorz', 'grzegorz');
   await waitForDashboard(page);
+  await page.locator('#nav-locations').click();
 
   await expect(page.locator('.theme-toggle')).toHaveCount(2);
   await expect(page.locator('#locations-table tbody tr').first()).toBeVisible();
