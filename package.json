@@ -2,10 +2,10 @@
   "name": "g2labs-home-dashboard",
   "version": "1.0.0",
   "description": "Home dashboard for thermometer data from ATC BLE sensors via MQTT",
-  "main": "server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

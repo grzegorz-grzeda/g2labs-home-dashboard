@@ -3,19 +3,20 @@
 ## Structure
 
 ```
-server.js               — entry point: HTTP server, Socket.io, MongoDB, MQTT wiring
-app.js                  — Express config: middleware and route mounts (importable without binding a port)
-mqtt/
-  subscriber.js         — MQTT connection, topic subscription, emits parsed 'reading' events via EventEmitter
-  atc.js                — pure ATC frame decoder (hex → { temperature, humidity, battery, frameCounter })
-services/
-  readings.js           — location lookup, deduplication, DB write, Socket.io emit
-routes/
-  locations.js          — CRUD for Location documents
-  readings.js           — GET /api/current, GET /api/history/:locationId
-models/
-  Location.js           — { name, sensorMac }
-  Reading.js            — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
+src/
+  server.js             — entry point: HTTP server, Socket.io, MongoDB, MQTT wiring
+  app.js                — Express config: middleware and route mounts (importable without binding a port)
+  mqtt/
+    subscriber.js       — MQTT connection, topic subscription, emits parsed 'reading' events via EventEmitter
+    atc.js              — pure ATC frame decoder (hex → { temperature, humidity, battery, frameCounter })
+  services/
+    readings.js         — location lookup, deduplication, DB write, Socket.io emit
+  routes/
+    locations.js        — CRUD for Location documents
+    readings.js         — GET /api/current, GET /api/history/:locationId
+  models/
+    Location.js         — { name, sensorMac }
+    Reading.js          — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
 public/
   index.html
   style.css
@@ -60,15 +61,15 @@ ATC MiThermometer (BLE advertisement)
 
 | File | Responsibility |
 |---|---|
-| `server.js` | Entry point — HTTP server, Socket.io, MongoDB, MQTT wiring |
-| `app.js` | Express app config — middleware and route mounts, importable without a port |
-| `mqtt/subscriber.js` | MQTT lifecycle, raw message → parsed event via EventEmitter |
-| `mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
-| `services/readings.js` | Location lookup, dedup, DB write, Socket.io emit |
-| `routes/locations.js` | Location CRUD API |
-| `routes/readings.js` | Current + history query API |
-| `models/Location.js` | Mongoose schema for named sensor locations |
-| `models/Reading.js` | Mongoose schema for timestamped sensor readings |
+| `src/server.js` | Entry point — HTTP server, Socket.io, MongoDB, MQTT wiring |
+| `src/app.js` | Express app config — middleware and route mounts, importable without a port |
+| `src/mqtt/subscriber.js` | MQTT lifecycle, raw message → parsed event via EventEmitter |
+| `src/mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
+| `src/services/readings.js` | Location lookup, dedup, DB write, Socket.io emit |
+| `src/routes/locations.js` | Location CRUD API |
+| `src/routes/readings.js` | Current + history query API |
+| `src/models/Location.js` | Mongoose schema for named sensor locations |
+| `src/models/Reading.js` | Mongoose schema for timestamped sensor readings |
 | `public/app.js` | Dashboard UI: cards, charts, location management, theme toggle |
 
 ## Decisions log

@@ -4,9 +4,9 @@
 
 Before making any changes, read:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module structure, data flow, and decisions log
-- [`app.js`](app.js) — Express config (middleware, routes)
-- [`server.js`](server.js) — entry point (HTTP, Socket.io, MongoDB, MQTT)
-- [`models/`](models/) — Mongoose schemas for Location and Reading
+- [`src/app.js`](src/app.js) — Express config (middleware, routes)
+- [`src/server.js`](src/server.js) — entry point (HTTP, Socket.io, MongoDB, MQTT)
+- [`src/models/`](src/models/) — Mongoose schemas for Location and Reading
 
 ## Running the project
 
