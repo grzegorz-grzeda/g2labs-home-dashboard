@@ -1,0 +1,209 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0f1117;
+  color: #e0e0e0;
+  padding: 1.5rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+h1 { font-size: 1.6rem; font-weight: 600; }
+h2 { font-size: 1.1rem; font-weight: 500; color: #9ca3af; margin-bottom: 1rem; }
+h3 { font-size: 0.9rem; font-weight: 500; color: #9ca3af; margin-bottom: 0.5rem; }
+
+section { margin-bottom: 2.5rem; }
+
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge.connected    { background: #14532d; color: #86efac; }
+.badge.disconnected { background: #450a0a; color: #fca5a5; }
+
+/* Current reading cards */
+#cards-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.card {
+  background: #1c1f2e;
+  border: 1px solid #2d3148;
+  border-radius: 12px;
+  padding: 1.2rem 1.5rem;
+  min-width: 200px;
+  transition: border-color 0.3s;
+}
+
+.card.updated { border-color: #6366f1; }
+
+.card .device-name {
+  font-size: 0.85rem;
+  color: #818cf8;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.card .metrics { display: flex; gap: 1.5rem; }
+
+.card .metric { text-align: center; }
+
+.card .value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.card .unit {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+
+.card .temp-value { color: #f97316; }
+.card .humid-value { color: #38bdf8; }
+.card .battery-value { color: #a3e635; }
+
+.card .updated-at {
+  font-size: 0.7rem;
+  color: #4b5563;
+  margin-top: 0.8rem;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls select {
+  background: #1c1f2e;
+  border: 1px solid #2d3148;
+  color: #e0e0e0;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Charts */
+#charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 1rem;
+}
+
+.chart-box {
+  background: #1c1f2e;
+  border: 1px solid #2d3148;
+  border-radius: 12px;
+  padding: 1.2rem;
+}
+
+.chart-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #818cf8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+}
+
+.chart-box canvas {
+  max-height: 200px;
+}
+
+.chart-box canvas {
+  max-height: 220px;
+}
+
+/* Locations table */
+#locations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+#locations-table th {
+  text-align: left;
+  color: #6b7280;
+  font-weight: 500;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid #2d3148;
+}
+
+#locations-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #1a1d2b;
+  vertical-align: middle;
+}
+
+#locations-table tfoot td {
+  border-bottom: none;
+  padding-top: 0.75rem;
+}
+
+#locations-table input[type="text"] {
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  color: #e0e0e0;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+#locations-table input[type="text"]:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.actions { display: flex; gap: 0.4rem; white-space: nowrap; }
+
+.btn {
+  padding: 0.25rem 0.65rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-add    { background: #312e81; color: #c7d2fe; }
+.btn-edit   { background: #1e3a5f; color: #93c5fd; }
+.btn-save   { background: #14532d; color: #86efac; }
+.btn-cancel { background: #2d2d2d; color: #9ca3af; }
+.btn-delete { background: #450a0a; color: #fca5a5; }
+
+.btn:hover { filter: brightness(1.2); }
+
+.error-msg {
+  color: #fca5a5;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  min-height: 1em;
+}
