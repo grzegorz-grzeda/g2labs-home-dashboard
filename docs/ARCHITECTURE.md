@@ -4,16 +4,22 @@
 
 ```
 src/
-  server.js             — entry point: HTTP server, Socket.io, MongoDB, MQTT wiring
-  app.js                — Express config: middleware and route mounts (importable without binding a port)
+  server.js             — entry point and composition root: HTTP server, Socket.io, db, reading source wiring
+  app.js                — Express app factory: middleware and route mounts with injected dependencies
+  config.js             — env parsing and runtime mode selection
+  adapters/
+    db/
+      mongo.js          — MongoDB-backed db adapter
+      mock.js           — in-memory db adapter for tests/demo mode
   mqtt/
     subscriber.js       — MQTT connection, topic subscription, emits parsed 'reading' events via EventEmitter
+    mock-generator.js   — generated readings source for tests/demo mode
     atc.js              — pure ATC frame decoder (hex → { temperature, humidity, battery, frameCounter })
   services/
-    readings.js         — location lookup, deduplication, DB write, Socket.io emit
+    readings.js         — injected reading handler: location lookup, deduplication, DB write, Socket.io emit
   routes/
-    locations.js        — CRUD for Location documents
-    readings.js         — GET /api/current, GET /api/history/:locationId
+    locations.js        — location CRUD router factory
+    readings.js         — readings query router factory
   models/
     Location.js         — { name, sensorMac }
     Reading.js          — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
@@ -34,40 +40,45 @@ ATC MiThermometer (BLE advertisement)
       blester (one or more RPi scanners)
         │ MQTT  topic: atc  or  atc/#
         ▼
-  mqtt/subscriber.js
-    - connects to broker
-    - parses raw JSON payload
-    - calls mqtt/atc.js to decode service_data hex
-    - emits internal 'reading' event: { address, name, rssi, temperature, humidity, battery, frameCounter }
+  mqtt/subscriber.js or mqtt/mock-generator.js
+    - connects to broker and parses messages
+      or generates synthetic readings in test mode
+    - emits internal 'reading' event: { address, rssi, temperature, humidity, battery, frameCounter }
         │
         ▼
-  services/readings.js  (listens to 'reading' event)
+  services/readings.js  (injected handler)
     - looks up Location by MAC address
     - drops silently if MAC is unassigned
     - deduplication: checks (locationId, frameCounter) within 10s window
-    - writes Reading document to MongoDB
+    - writes Reading through the configured db adapter
     - emits Socket.io 'reading' event to all browser clients
         │
         ├──▶ MongoDB (persistent storage)
         │
+        ├──▶ Mock DB (test/demo mode)
+        │
         └──▶ Browser (Socket.io — live card updates)
                 │
                 └── GET /api/history/:locationId  (on page load / range change)
-                      - $bucketAuto aggregation, max 300 buckets
-                      - timestamp averaged as $toLong → $toDate
+                      - Mongo: $bucketAuto aggregation, max 300 buckets
+                      - Mock DB: equivalent in-memory bucketing
 ```
 
 ## Module responsibilities
 
 | File | Responsibility |
 |---|---|
-| `src/server.js` | Entry point — HTTP server, Socket.io, MongoDB, MQTT wiring |
-| `src/app.js` | Express app config — middleware and route mounts, importable without a port |
+| `src/server.js` | Entry point and composition root — injects db + reading source adapters |
+| `src/app.js` | Express app factory — middleware and route mounts with injected dependencies |
+| `src/config.js` | Runtime config and mode selection |
+| `src/adapters/db/mongo.js` | Mongo-backed db adapter |
+| `src/adapters/db/mock.js` | In-memory db adapter for test/demo mode |
 | `src/mqtt/subscriber.js` | MQTT lifecycle, raw message → parsed event via EventEmitter |
+| `src/mqtt/mock-generator.js` | Synthetic reading source for tests and local demos |
 | `src/mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
-| `src/services/readings.js` | Location lookup, dedup, DB write, Socket.io emit |
-| `src/routes/locations.js` | Location CRUD API |
-| `src/routes/readings.js` | Current + history query API |
+| `src/services/readings.js` | Injected reading handler: lookup, dedup, DB write, Socket.io emit |
+| `src/routes/locations.js` | Location CRUD router factory |
+| `src/routes/readings.js` | Current + history query router factory |
 | `src/models/Location.js` | Mongoose schema for named sensor locations |
 | `src/models/Reading.js` | Mongoose schema for timestamped sensor readings |
 | `public/app.js` | Dashboard UI: cards, charts, location management, theme toggle |
@@ -91,6 +102,9 @@ Deleting a location cascades to delete its readings (clean slate, no orphans).
 
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.
+
+### Dependency injection: adapters chosen at startup
+The entry point composes the app from injected dependencies. Production uses MongoDB + MQTT. Test/demo mode can swap these for an in-memory db and a generated reading source without changing route logic, Socket.io behavior, or reading processing rules.
 
 ### Chart scales: shared across locations, ±5 padding
 All location charts use the same y-axis min/max so sensors can be visually compared. Scales are computed from the global min/max of all loaded data, with ±5 units of padding. Scales are recalculated live when an incoming reading would breach the current padding.

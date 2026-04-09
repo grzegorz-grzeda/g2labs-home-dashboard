@@ -1,49 +1,20 @@
 const express = require('express');
-const router = express.Router();
-const mongoose = require('mongoose');
-const Location = require('../models/Location');
-const Reading = require('../models/Reading');
 
-const CHART_BUCKETS = parseInt(process.env.CHART_BUCKETS) || 300;
+function createReadingsRouter({ db, chartBuckets }) {
+  const router = express.Router();
 
-// Current reading per location (latest)
-router.get('/current', async (req, res) => {
-  const locations = await Location.find().lean();
-  const results = await Promise.all(
-    locations.map(async loc => {
-      const reading = await Reading.findOne({ locationId: loc._id }).sort({ timestamp: -1 }).lean();
-      return { location: loc, reading };
-    })
-  );
-  res.json(results);
-});
+  router.get('/current', async (req, res) => {
+    const results = await db.getCurrentReadings();
+    res.json(results);
+  });
 
-// Historical readings for a location, downsampled via $bucketAuto
-router.get('/history/:locationId', async (req, res) => {
-  const hours = parseInt(req.query.hours) || 24;
-  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-  const locationId = new mongoose.Types.ObjectId(req.params.locationId);
+  router.get('/history/:locationId', async (req, res) => {
+    const hours = parseInt(req.query.hours, 10) || 24;
+    const readings = await db.getHistory(req.params.locationId, { hours, buckets: chartBuckets });
+    res.json(readings);
+  });
 
-  const readings = await Reading.aggregate([
-    { $match: { locationId, timestamp: { $gte: since } } },
-    { $sort: { timestamp: 1 } },
-    {
-      $bucketAuto: {
-        groupBy: '$timestamp',
-        buckets: CHART_BUCKETS,
-        output: {
-          timestamp:   { $avg: { $toLong: '$timestamp' } },
-          temperature: { $avg: '$temperature' },
-          humidity:    { $avg: '$humidity' },
-          battery:     { $last: '$battery' },
-        },
-      },
-    },
-    { $addFields: { timestamp: { $toDate: '$timestamp' } } },
-    { $sort: { timestamp: 1 } },
-  ]);
+  return router;
+}
 
-  res.json(readings);
-});
-
-module.exports = router;
+module.exports = createReadingsRouter;

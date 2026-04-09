@@ -1,12 +1,16 @@
 const express = require('express');
-const locationsRouter = require('./routes/locations');
-const readingsRouter = require('./routes/readings');
+const createLocationsRouter = require('./routes/locations');
+const createReadingsRouter = require('./routes/readings');
 
-const app = express();
+function createApp({ db, chartBuckets }) {
+  const app = express();
 
-app.use(express.static('public'));
-app.use(express.json());
-app.use('/api/locations', locationsRouter);
-app.use('/api', readingsRouter);
+  app.use(express.static('public'));
+  app.use(express.json());
+  app.use('/api/locations', createLocationsRouter({ db }));
+  app.use('/api', createReadingsRouter({ db, chartBuckets }));
 
-module.exports = app;
+  return app;
+}
+
+module.exports = { createApp };

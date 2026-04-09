@@ -1,49 +1,53 @@
 const express = require('express');
-const router = express.Router();
-const Location = require('../models/Location');
-const Reading = require('../models/Reading');
 
-// List all locations
-router.get('/', async (req, res) => {
-  const locations = await Location.find().lean();
-  res.json(locations);
-});
+function isDuplicateSensorMacError(err) {
+  return err && err.code === 11000;
+}
 
-// Create location
-router.post('/', async (req, res) => {
-  const { name, sensorMac } = req.body;
-  if (!name || !sensorMac) return res.status(400).json({ error: 'name and sensorMac required' });
-  try {
-    const loc = await Location.create({ name, sensorMac: sensorMac.toUpperCase() });
-    res.status(201).json(loc);
-  } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'sensorMac already assigned' });
-    throw err;
-  }
-});
+function createLocationsRouter({ db }) {
+  const router = express.Router();
 
-// Update location
-router.put('/:id', async (req, res) => {
-  const { name, sensorMac } = req.body;
-  const update = {};
-  if (name) update.name = name;
-  if (sensorMac) update.sensorMac = sensorMac.toUpperCase();
-  try {
-    const loc = await Location.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
-    if (!loc) return res.status(404).json({ error: 'not found' });
-    res.json(loc);
-  } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'sensorMac already assigned' });
-    throw err;
-  }
-});
+  router.get('/', async (req, res) => {
+    const locations = await db.listLocations();
+    res.json(locations);
+  });
 
-// Delete location and its readings
-router.delete('/:id', async (req, res) => {
-  const loc = await Location.findByIdAndDelete(req.params.id);
-  if (!loc) return res.status(404).json({ error: 'not found' });
-  await Reading.deleteMany({ locationId: req.params.id });
-  res.json({ ok: true });
-});
+  router.post('/', async (req, res) => {
+    const { name, sensorMac } = req.body;
+    if (!name || !sensorMac) return res.status(400).json({ error: 'name and sensorMac required' });
 
-module.exports = router;
+    try {
+      const location = await db.createLocation({ name, sensorMac });
+      res.status(201).json(location);
+    } catch (err) {
+      if (isDuplicateSensorMacError(err)) return res.status(409).json({ error: 'sensorMac already assigned' });
+      throw err;
+    }
+  });
+
+  router.put('/:id', async (req, res) => {
+    const { name, sensorMac } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (sensorMac) update.sensorMac = sensorMac;
+
+    try {
+      const location = await db.updateLocation(req.params.id, update);
+      if (!location) return res.status(404).json({ error: 'not found' });
+      res.json(location);
+    } catch (err) {
+      if (isDuplicateSensorMacError(err)) return res.status(409).json({ error: 'sensorMac already assigned' });
+      throw err;
+    }
+  });
+
+  router.delete('/:id', async (req, res) => {
+    const deleted = await db.deleteLocation(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'not found' });
+    res.json({ ok: true });
+  });
+
+  return router;
+}
+
+module.exports = createLocationsRouter;

@@ -1,3 +1,5 @@
 node_modules/
 .env
 .codex
+playwright-report/
+test-results/

@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test:ui": "playwright test",
+    "test:ui:headed": "playwright test --headed",
+    "test:ui:debug": "playwright test --debug"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -13,5 +16,8 @@
     "mongoose": "^8.7.0",
     "mqtt": "^5.10.1",
     "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1"
   }
 }
