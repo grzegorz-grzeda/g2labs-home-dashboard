@@ -1,6 +1,6 @@
 const DEDUP_WINDOW_SECONDS = 10;
 
-function createReadingHandler({ db, io, now = () => new Date() }) {
+function createReadingHandler({ db, emitReading, now = () => new Date() }) {
   return async function handleReading(reading) {
     const { address, rssi, temperature, humidity, battery, frameCounter } = reading;
 
@@ -26,8 +26,9 @@ function createReadingHandler({ db, io, now = () => new Date() }) {
       timestamp,
     });
 
-    io.emit('reading', {
+    emitReading({
       locationId: location._id.toString(),
+      groupId: location.groupId?.toString?.() || String(location.groupId),
       locationName: location.name,
       temperature,
       humidity,

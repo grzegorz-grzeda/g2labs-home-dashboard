@@ -7,7 +7,8 @@ A local web dashboard for ATC MiThermometer BLE sensor data. Subscribes to MQTT 
 ## Features
 
 - Parses ATC custom advertisement format from blester MQTT payloads
-- Location management — assign sensor MACs to named rooms via the UI
+- Group-aware location management — assign sensor MACs to named rooms and groups via the UI
+- User context with group-based access control for location readouts
 - Historical charts with automatic resolution scaling (`$bucketAuto`) across any time range
 - Shared y-axis scales across all location charts with ±5 padding
 - Real-time card updates via Socket.io
@@ -76,6 +77,7 @@ In test mode:
 - the database dependency is injected as an in-memory mock adapter
 - the MQTT dependency is injected as a generated reading source
 - the dashboard still uses the same HTTP routes and Socket.io updates as production
+- seeded users and groups are available through the header user switcher so access filtering can be exercised without real auth
 
 ## UI testing
 
@@ -98,7 +100,29 @@ Current coverage includes:
 - dashboard smoke test for seeded cards and charts
 - clock format toggle behavior
 - location CRUD flow in the mock DB
+- user switching and group-based access filtering
 - mobile viewport smoke test
+
+## User and group access
+
+Locations belong to a single group. Users can belong to one or more groups. A user can view current readings, historical charts, and location rows only for locations assigned to one of their groups.
+
+The current implementation uses request and socket user context rather than full login/session auth:
+
+- HTTP requests resolve the current user from the `x-user-id` header when provided
+- Socket.io connections resolve the current user from the client auth payload
+- if no explicit user is supplied, the default user is used
+
+In test mode, the seeded users are:
+
+- `Grzegorz` as an `admin`, with access to all groups
+- `Anna` with access to `Family`
+
+Default Mongo bootstrap behavior:
+
+- if no groups exist, the app creates `Default Home`
+- if no users exist, the app creates `Default Admin` with username `admin` and role `admin`
+- existing locations without a `groupId` are assigned to `Default Home`
 
 ## Data flow
 

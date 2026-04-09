@@ -32,7 +32,23 @@ async function startServer(config = getConfig()) {
   const server = http.createServer(app);
   const io = new Server(server);
   const readingSource = createReadingSource(config, db);
-  const handleReading = createReadingHandler({ db, io });
+  io.use(async (socket, next) => {
+    try {
+      const requestedUserId = socket.handshake.auth?.userId || socket.handshake.query?.userId || null;
+      socket.data.userContext = await db.resolveUserContext(requestedUserId, { failIfMissing: Boolean(requestedUserId) });
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  const emitReading = reading => {
+    for (const socket of io.sockets.sockets.values()) {
+      const groupIds = socket.data.userContext?.groupIds || [];
+      if (groupIds.includes(reading.groupId)) socket.emit('reading', reading);
+    }
+  };
+  const handleReading = createReadingHandler({ db, emitReading });
   const onReading = reading => {
     handleReading(reading).catch(err => console.error('Reading handling error:', err));
   };

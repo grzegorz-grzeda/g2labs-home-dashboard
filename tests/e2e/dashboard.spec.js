@@ -3,8 +3,9 @@ const { test, expect } = require('@playwright/test');
 async function waitForDashboard(page) {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Home Dashboard' })).toBeVisible();
-  await expect(page.locator('#cards-container .card')).toHaveCount(3);
-  await expect(page.locator('#charts-container .chart-box')).toHaveCount(3);
+  await expect(page.locator('#user-select')).toHaveValue(/.+/);
+  await expect(page.locator('#cards-container .card')).toHaveCount(4);
+  await expect(page.locator('#charts-container .chart-box')).toHaveCount(4);
 }
 
 test('renders seeded cards and charts in mock mode', async ({ page }) => {
@@ -14,10 +15,15 @@ test('renders seeded cards and charts in mock mode', async ({ page }) => {
     'Living Room',
     'Bedroom',
     'Kitchen',
+    'Garage',
   ]);
 
   await expect(page.locator('#connection-status')).toHaveText('Live');
-  await expect(page.locator('#charts-container canvas')).toHaveCount(3);
+  await expect(page.locator('#user-role')).toHaveText('Admin');
+  await expect(page.locator('#charts-container canvas')).toHaveCount(4);
+  await expect(page.locator('#group-summary')).toContainText('All groups');
+  await expect(page.locator('#group-summary')).toContainText('Family');
+  await expect(page.locator('#group-summary')).toContainText('Garage');
 });
 
 test('clock format toggle updates visible timestamp formatting', async ({ page }) => {
@@ -41,18 +47,34 @@ test('locations CRUD works against the mock db', async ({ page }) => {
 
   await page.locator('#new-name').fill(newName);
   await page.locator('#new-mac').fill(newMac);
+  await page.locator('#new-group').selectOption({ label: 'Garage' });
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(page.locator('#locations-tbody')).toContainText(newName);
+  await expect(page.locator('#locations-tbody')).toContainText('Garage');
 
   const officeRow = page.locator('#locations-tbody tr').filter({ hasText: newName });
   await officeRow.getByRole('button', { name: 'Edit' }).click();
   await officeRow.locator('.cell-input').first().fill('Office Upstairs');
+  await officeRow.locator('.group-input').selectOption({ label: 'Family' });
   await officeRow.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('#locations-tbody')).toContainText('Office Upstairs');
+  await expect(officeRow).toContainText('Family');
 
   page.once('dialog', dialog => dialog.accept());
   await officeRow.getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('#locations-tbody')).not.toContainText('Office Upstairs');
+});
+
+test('switching users filters locations by group access', async ({ page }) => {
+  await waitForDashboard(page);
+
+  await page.locator('#user-select').selectOption({ label: 'Anna' });
+  await expect(page.locator('#cards-container .card')).toHaveCount(3);
+  await expect(page.locator('#charts-container .chart-box')).toHaveCount(3);
+  await expect(page.locator('#cards-container')).not.toContainText('Garage');
+  await expect(page.locator('#locations-tbody')).not.toContainText('Garage');
+  await expect(page.locator('#user-role')).toHaveText('Member');
+  await expect(page.locator('#group-summary')).toHaveText('Family');
 });
 
 test('mobile layout keeps the dashboard usable', async ({ page, isMobile }) => {

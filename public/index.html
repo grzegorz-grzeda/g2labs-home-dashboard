@@ -13,6 +13,12 @@
   <header>
     <h1>Home Dashboard</h1>
     <div id="connection-status" class="badge disconnected">Disconnected</div>
+    <div class="user-context">
+      <label for="user-select">User</label>
+      <select id="user-select"></select>
+      <div id="user-role" class="badge user-role"></div>
+      <div id="group-summary" class="group-summary"></div>
+    </div>
     <div id="time-format-toggle" class="theme-toggle time-format-toggle" title="Clock format">
       <button data-time-format="system">System</button>
       <button data-time-format="24h">24h</button>
@@ -53,6 +59,7 @@
           <tr>
             <th>Name</th>
             <th>Sensor MAC</th>
+            <th>Group</th>
             <th></th>
           </tr>
         </thead>
@@ -61,6 +68,7 @@
           <tr>
             <td data-label="Name"><input id="new-name" type="text" placeholder="Room name" /></td>
             <td data-label="Sensor MAC"><input id="new-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" /></td>
+            <td data-label="Group"><select id="new-group"></select></td>
             <td data-label="Actions"><button id="add-location-btn" class="btn btn-add">Add</button></td>
           </tr>
         </tfoot>

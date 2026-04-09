@@ -37,12 +37,17 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Deduplication uses the ATC frame counter plus a 10-second time window. Do not replace this with a unique index.
 - Readings are stamped with `locationId` at ingest time. Reassigning a sensor must not move historical data.
 - Deleting a location must also delete its readings.
+- Locations belong to exactly one group.
+- Users can belong to multiple groups.
+- Users have a role; admin users can access all groups.
+- Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
 
 ## Frontend conventions
 
 - Prefer existing CSS custom properties for theme-aware UI surfaces.
 - When chart UI colors should react to theme changes, read them from CSS variables via `cssVar()`.
 - Keep the dashboard usable on small screens; preserve responsive behavior when changing layouts, cards, tables, or charts.
+- Preserve the user context controls when changing the header or location management UI.
 
 ## Verification
 

@@ -61,6 +61,33 @@ header {
   margin-bottom: 2rem;
 }
 
+.user-context {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+}
+
+.user-context label,
+.group-summary {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.user-role {
+  padding-inline: 0.55rem;
+}
+
+.user-context select {
+  background: transparent;
+  color: var(--text);
+  border: none;
+  font-size: 0.9rem;
+}
+
 h1 { font-size: 1.6rem; font-weight: 600; }
 h2 { font-size: 1.1rem; font-weight: 500; color: var(--text-muted); margin-bottom: 1rem; }
 
@@ -252,6 +279,16 @@ section { margin-bottom: 2.5rem; }
 }
 
 #locations-table input[type="text"] {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+#locations-table select {
   background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--text);

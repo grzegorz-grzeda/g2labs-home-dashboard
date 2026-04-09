@@ -9,6 +9,18 @@ function duplicateSensorMacError() {
   return err;
 }
 
+function forbiddenGroupError() {
+  const err = new Error('group access denied');
+  err.code = 'FORBIDDEN_GROUP';
+  return err;
+}
+
+function userNotFoundError() {
+  const err = new Error('unknown user context');
+  err.code = 'USER_NOT_FOUND';
+  return err;
+}
+
 function normalizeSensorMac(sensorMac) {
   return sensorMac.toUpperCase();
 }
@@ -37,9 +49,10 @@ function aggregateHistory(readings, buckets) {
 
 function createSeedLocations(makeId) {
   return [
-    { _id: makeId(), name: 'Living Room', sensorMac: 'AA:BB:CC:DD:EE:01' },
-    { _id: makeId(), name: 'Bedroom', sensorMac: 'AA:BB:CC:DD:EE:02' },
-    { _id: makeId(), name: 'Kitchen', sensorMac: 'AA:BB:CC:DD:EE:03' },
+    { _id: makeId(), name: 'Living Room', sensorMac: 'AA:BB:CC:DD:EE:01', groupId: null },
+    { _id: makeId(), name: 'Bedroom', sensorMac: 'AA:BB:CC:DD:EE:02', groupId: null },
+    { _id: makeId(), name: 'Kitchen', sensorMac: 'AA:BB:CC:DD:EE:03', groupId: null },
+    { _id: makeId(), name: 'Garage', sensorMac: 'AA:BB:CC:DD:EE:04', groupId: null },
   ];
 }
 
@@ -68,10 +81,77 @@ function createSeedReadings(locations, now) {
   return readings;
 }
 
-function createMockDb({ initialLocations, initialReadings, now = () => new Date() } = {}) {
+function createSeedGroups(makeId) {
+  return [
+    { _id: makeId(), name: 'Family', description: 'Main household shared areas' },
+    { _id: makeId(), name: 'Garage', description: 'Garage and workshop spaces' },
+  ];
+}
+
+function createSeedUsers(makeId, groups) {
+  const familyGroup = groups.find(group => group.name === 'Family');
+  const garageGroup = groups.find(group => group.name === 'Garage');
+  return [
+    {
+      _id: makeId(),
+      name: 'Grzegorz',
+      username: 'grzegorz',
+      role: 'admin',
+      groupIds: [familyGroup._id, garageGroup._id],
+    },
+    {
+      _id: makeId(),
+      name: 'Anna',
+      username: 'anna',
+      role: 'member',
+      groupIds: [familyGroup._id],
+    },
+  ];
+}
+
+function withGroupViews(location, groups) {
+  const group = groups.find(entry => entry._id === location.groupId);
+  return {
+    ...location,
+    groupName: group ? group.name : '',
+  };
+}
+
+function buildUserContext(user, groups) {
+  const visibleGroups = (user.role || 'member') === 'admin'
+    ? groups
+    : groups.filter(group => user.groupIds.includes(group._id));
+  return {
+    user: { ...user },
+    groups: visibleGroups.map(group => ({ ...group })),
+    groupIds: visibleGroups.map(group => group._id),
+    role: user.role || 'member',
+  };
+}
+
+function hasGroupAccess(userContext, groupId) {
+  if (userContext.role === 'admin') return true;
+  return userContext.groupIds.includes(groupId);
+}
+
+function createMockDb({ initialGroups, initialUsers, initialLocations, initialReadings, now = () => new Date() } = {}) {
   const makeId = createIdGenerator();
+  const groups = initialGroups || createSeedGroups(makeId);
+  const seededLocations = initialLocations || createSeedLocations(makeId);
+  const familyGroup = groups.find(group => group.name === 'Family');
+  const garageGroup = groups.find(group => group.name === 'Garage');
+  const hydratedLocations = seededLocations.map(location => ({
+    ...location,
+    groupId: location.groupId || (location.name === 'Garage' ? garageGroup._id : familyGroup._id),
+  }));
+
   const state = {
-    locations: (initialLocations || createSeedLocations(makeId)).map(location => ({
+    groups: groups.map(group => ({ ...group })),
+    users: (initialUsers || createSeedUsers(makeId, groups)).map(user => ({
+      ...user,
+      groupIds: [...user.groupIds],
+    })),
+    locations: hydratedLocations.map(location => ({
       ...location,
       sensorMac: normalizeSensorMac(location.sensorMac),
     })),
@@ -89,22 +169,51 @@ function createMockDb({ initialLocations, initialReadings, now = () => new Date(
 
     async disconnect() {},
 
-    async listLocations() {
-      return state.locations.map(location => ({ ...location }));
+    async resolveUserContext(userId, { failIfMissing = false } = {}) {
+      const selectedUser = userId
+        ? state.users.find(user => user._id === userId)
+        : state.users[0];
+      if (!selectedUser) {
+        if (failIfMissing) throw userNotFoundError();
+        if (!state.users[0]) throw userNotFoundError();
+        return buildUserContext(state.users[0], state.groups);
+      }
+      return buildUserContext(selectedUser, state.groups);
     },
 
-    async createLocation({ name, sensorMac }) {
+    async listUsers() {
+      return state.users.map(user => ({
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        role: user.role || 'member',
+        groupIds: [...user.groupIds],
+        groups: state.groups
+          .filter(group => user.groupIds.includes(group._id))
+          .map(group => ({ _id: group._id, name: group.name })),
+      }));
+    },
+
+    async listLocations(userContext) {
+      return state.locations
+        .filter(location => hasGroupAccess(userContext, location.groupId))
+        .map(location => withGroupViews({ ...location }, state.groups));
+    },
+
+    async createLocation(userContext, { name, sensorMac, groupId }) {
       const normalizedMac = normalizeSensorMac(sensorMac);
       if (state.locations.some(location => location.sensorMac === normalizedMac)) throw duplicateSensorMacError();
+      if (!hasGroupAccess(userContext, groupId)) throw forbiddenGroupError();
 
-      const location = { _id: makeId(), name, sensorMac: normalizedMac };
+      const location = { _id: makeId(), name, sensorMac: normalizedMac, groupId };
       state.locations.push(location);
-      return { ...location };
+      return withGroupViews({ ...location }, state.groups);
     },
 
-    async updateLocation(id, update) {
+    async updateLocation(userContext, id, update) {
       const location = state.locations.find(entry => entry._id === id);
       if (!location) return null;
+      if (!hasGroupAccess(userContext, location.groupId)) throw forbiddenGroupError();
 
       if (update.sensorMac) {
         const normalizedMac = normalizeSensorMac(update.sensorMac);
@@ -113,13 +222,18 @@ function createMockDb({ initialLocations, initialReadings, now = () => new Date(
         location.sensorMac = normalizedMac;
       }
       if (update.name) location.name = update.name;
+      if (update.groupId) {
+        if (!hasGroupAccess(userContext, update.groupId)) throw forbiddenGroupError();
+        location.groupId = update.groupId;
+      }
 
-      return { ...location };
+      return withGroupViews({ ...location }, state.groups);
     },
 
-    async deleteLocation(id) {
+    async deleteLocation(userContext, id) {
       const index = state.locations.findIndex(location => location._id === id);
       if (index === -1) return false;
+      if (!hasGroupAccess(userContext, state.locations[index].groupId)) throw forbiddenGroupError();
 
       state.locations.splice(index, 1);
       state.readings = state.readings.filter(reading => reading.locationId !== id);
@@ -149,19 +263,24 @@ function createMockDb({ initialLocations, initialReadings, now = () => new Date(
       return { ...nextReading };
     },
 
-    async getCurrentReadings() {
-      return state.locations.map(location => {
+    async getCurrentReadings(userContext) {
+      return state.locations
+        .filter(location => hasGroupAccess(userContext, location.groupId))
+        .map(location => {
         const reading = state.readings
           .filter(entry => entry.locationId === location._id)
           .sort((a, b) => b.timestamp - a.timestamp)[0];
         return {
-          location: { ...location },
+          location: withGroupViews({ ...location }, state.groups),
           reading: reading ? { ...reading } : null,
         };
       });
     },
 
-    async getHistory(locationId, { hours, buckets }) {
+    async getHistory(userContext, locationId, { hours, buckets }) {
+      const location = state.locations.find(entry => entry._id === locationId);
+      if (!location) return [];
+      if (!hasGroupAccess(userContext, location.groupId)) throw forbiddenGroupError();
       const since = new Date(now().getTime() - hours * 60 * 60 * 1000);
       const readings = state.readings
         .filter(reading => reading.locationId === locationId && reading.timestamp >= since)

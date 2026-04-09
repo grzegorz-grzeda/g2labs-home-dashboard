@@ -1,10 +1,14 @@
-const socket = io();
+let socket;
 const statusBadge = document.getElementById('connection-status');
 const cardsContainer = document.getElementById('cards-container');
 const chartsContainer = document.getElementById('charts-container');
 const rangeSelect = document.getElementById('range-select');
 const locationsTbody = document.getElementById('locations-tbody');
 const locationsError = document.getElementById('locations-error');
+const userSelect = document.getElementById('user-select');
+const userRole = document.getElementById('user-role');
+const groupSummary = document.getElementById('group-summary');
+const newGroupSelect = document.getElementById('new-group');
 
 // { locationId -> card element }
 const cards = {};
@@ -14,6 +18,7 @@ const charts = {};
 let locationsMap = {};
 // Current shared y-axis scales
 let currentScales = null;
+let currentUserContext = null;
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 function cssVar(name) {
@@ -91,24 +96,70 @@ document.querySelectorAll('.time-format-toggle button').forEach(btn => {
 
 applyTimeFormat(localStorage.getItem('time-format') || 'system');
 
-// ── Socket.io ─────────────────────────────────────────────────────────────────
-socket.on('connect', () => {
-  statusBadge.textContent = 'Live';
-  statusBadge.className = 'badge connected';
-});
-socket.on('disconnect', () => {
-  statusBadge.textContent = 'Disconnected';
-  statusBadge.className = 'badge disconnected';
-});
-socket.on('reading', reading => {
-  upsertCard(reading);
-  appendToChart(reading);
-});
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  await loadUserContext();
+  await reloadDashboard();
+}
+
+async function loadUserContext() {
+  const response = await apiFetch('/api/me');
+  if (response.status === 401 && getCurrentUserId()) {
+    localStorage.removeItem('current-user-id');
+    return loadUserContext();
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to load user context (${response.status})`);
+  }
+  const me = await response.json();
+  currentUserContext = me;
+  if (!getCurrentUserId()) localStorage.setItem('current-user-id', me.user._id);
+  renderUserSelect(me);
+  renderGroupOptions(me.groups);
+}
+
+function renderUserSelect(context) {
+  if (!userSelect || !groupSummary) return;
+  userSelect.innerHTML = context.availableUsers
+    .map(user => `<option value="${user._id}">${user.name}${user.role === 'admin' ? ' (Admin)' : ''}</option>`)
+    .join('');
+  userSelect.value = context.user._id;
+  if (userRole) {
+    userRole.textContent = context.user.role === 'admin' ? 'Admin' : 'Member';
+    userRole.className = `badge user-role ${context.user.role === 'admin' ? 'connected' : 'disconnected'}`;
+  }
+  groupSummary.textContent = context.user.role === 'admin'
+    ? `All groups: ${context.groups.map(group => group.name).join(', ')}`
+    : context.groups.map(group => group.name).join(', ');
+}
+
+function renderGroupOptions(groups) {
+  if (!newGroupSelect) return;
+  newGroupSelect.innerHTML = groups
+    .map(group => `<option value="${group._id}">${group.name}</option>`)
+    .join('');
+}
+
+function resetDashboardState() {
+  Object.values(charts).forEach(chart => chart.destroy());
+  Object.keys(charts).forEach(key => delete charts[key]);
+  Object.keys(cards).forEach(key => delete cards[key]);
+  locationsMap = {};
+  currentScales = null;
+  cardsContainer.innerHTML = '';
+  chartsContainer.innerHTML = '';
+  locationsTbody.innerHTML = '';
+}
+
+async function reloadDashboard() {
+  resetDashboardState();
+  connectSocket();
   await loadLocations();
-  const current = await fetch('/api/current').then(r => r.json());
+  const currentResponse = await apiFetch('/api/current');
+  if (!currentResponse.ok) {
+    throw new Error(`Failed to load current readings (${currentResponse.status})`);
+  }
+  const current = await currentResponse.json();
   current.forEach(({ location, reading }) => {
     if (reading) upsertCard({ locationId: location._id, locationName: location.name, ...reading });
   });
@@ -161,7 +212,7 @@ async function loadAllCharts() {
 
   // Fetch all readings in parallel, then compute shared scales
   const allReadings = await Promise.all(
-    locations.map(loc => fetch(`/api/history/${loc._id}?hours=${hours}`).then(r => r.json()))
+    locations.map(loc => apiFetch(`/api/history/${loc._id}?hours=${hours}`).then(r => r.json()))
   );
 
   const temps = allReadings.flat().map(r => r.temperature);
@@ -325,7 +376,11 @@ function recalcScalesAndUpdate() {
 
 // ── Locations CRUD ────────────────────────────────────────────────────────────
 async function loadLocations() {
-  const locations = await fetch('/api/locations').then(r => r.json());
+  const response = await apiFetch('/api/locations');
+  if (!response.ok) {
+    throw new Error(`Failed to load locations (${response.status})`);
+  }
+  const locations = await response.json();
   locationsMap = Object.fromEntries(locations.map(l => [l._id, l]));
   renderLocationsTable(locations);
 
@@ -349,6 +404,7 @@ function renderLocationsTable(locations) {
     tr.innerHTML = `
       <td data-label="Name"><span class="cell-text">${loc.name}</span><input class="cell-input" type="text" value="${loc.name}" style="display:none" /></td>
       <td data-label="Sensor MAC"><span class="cell-text">${loc.sensorMac}</span><input class="cell-input" type="text" value="${loc.sensorMac}" style="display:none" /></td>
+      <td data-label="Group"><span class="cell-text">${loc.groupName}</span>${renderGroupSelect(loc.groupId, 'display:none')}</td>
       <td class="actions" data-label="Actions">
         <button class="btn btn-edit">Edit</button>
         <button class="btn btn-save" style="display:none">Save</button>
@@ -362,6 +418,13 @@ function renderLocationsTable(locations) {
     tr.querySelector('.btn-delete').addEventListener('click', () => deleteLocation(loc._id));
     locationsTbody.appendChild(tr);
   });
+}
+
+function renderGroupSelect(selectedGroupId, style = '') {
+  const options = currentUserContext.groups
+    .map(group => `<option value="${group._id}" ${group._id === selectedGroupId ? 'selected' : ''}>${group.name}</option>`)
+    .join('');
+  return `<select class="cell-input group-input" style="${style}">${options}</select>`;
 }
 
 function startEdit(tr) {
@@ -385,10 +448,11 @@ async function saveEdit(tr, id) {
   const inputs = tr.querySelectorAll('.cell-input');
   const name = inputs[0].value.trim();
   const sensorMac = inputs[1].value.trim();
-  const res = await fetch(`/api/locations/${id}`, {
+  const groupId = inputs[2].value;
+  const res = await apiFetch(`/api/locations/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, sensorMac }),
+    body: JSON.stringify({ name, sensorMac, groupId }),
   });
   if (!res.ok) { setError((await res.json()).error); return; }
   setError('');
@@ -397,7 +461,7 @@ async function saveEdit(tr, id) {
 
 async function deleteLocation(id) {
   if (!confirm('Delete this location and all its readings?')) return;
-  await fetch(`/api/locations/${id}`, { method: 'DELETE' });
+  await apiFetch(`/api/locations/${id}`, { method: 'DELETE' });
   delete cards[id];
   document.querySelector(`[data-location-id="${id}"]`)?.remove();
   await loadLocations();
@@ -406,16 +470,23 @@ async function deleteLocation(id) {
 document.getElementById('add-location-btn').addEventListener('click', async () => {
   const name = document.getElementById('new-name').value.trim();
   const sensorMac = document.getElementById('new-mac').value.trim();
-  const res = await fetch('/api/locations', {
+  const groupId = newGroupSelect.value;
+  const res = await apiFetch('/api/locations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, sensorMac }),
+    body: JSON.stringify({ name, sensorMac, groupId }),
   });
   if (!res.ok) { setError((await res.json()).error); return; }
   setError('');
   document.getElementById('new-name').value = '';
   document.getElementById('new-mac').value = '';
   await loadLocations();
+});
+
+userSelect.addEventListener('change', async () => {
+  localStorage.setItem('current-user-id', userSelect.value);
+  await loadUserContext();
+  await reloadDashboard();
 });
 
 rangeSelect.addEventListener('change', loadAllCharts);
@@ -427,4 +498,45 @@ function formatTime(ts) {
   return formatLocalDateTime(ts);
 }
 
-init();
+init().catch(err => {
+  console.error('Dashboard init failed:', err);
+  statusBadge.textContent = 'Error';
+  statusBadge.className = 'badge disconnected';
+  setError(err.message || 'Failed to initialize dashboard');
+});
+function getCurrentUserId() {
+  return localStorage.getItem('current-user-id') || '';
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const userId = getCurrentUserId();
+  if (userId) headers.set('x-user-id', userId);
+  const response = await fetch(path, { ...options, headers });
+  return response;
+}
+
+function connectSocket() {
+  if (socket) socket.disconnect();
+  socket = io({
+    auth: { userId: getCurrentUserId() || undefined },
+  });
+
+  socket.on('connect', () => {
+    statusBadge.textContent = 'Live';
+    statusBadge.className = 'badge connected';
+  });
+  socket.on('disconnect', () => {
+    statusBadge.textContent = 'Disconnected';
+    statusBadge.className = 'badge disconnected';
+  });
+  socket.on('connect_error', err => {
+    statusBadge.textContent = 'Connection Error';
+    statusBadge.className = 'badge disconnected';
+    console.error('Socket connection error:', err.message);
+  });
+  socket.on('reading', reading => {
+    upsertCard(reading);
+    appendToChart(reading);
+  });
+}

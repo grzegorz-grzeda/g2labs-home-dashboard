@@ -21,12 +21,14 @@ src/
     locations.js        — location CRUD router factory
     readings.js         — readings query router factory
   models/
-    Location.js         — { name, sensorMac }
+    Group.js            — { name, description }
+    User.js             — { name, username, role, groupIds[] }
+    Location.js         — { name, sensorMac, groupId }
     Reading.js          — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
 public/
   index.html
   style.css
-  app.js                — dashboard UI: cards, charts, location management, theme toggle
+  app.js                — dashboard UI: cards, charts, user context switcher, location management, theme toggle
 docs/
   ARCHITECTURE.md
   img/
@@ -51,7 +53,7 @@ ATC MiThermometer (BLE advertisement)
     - drops silently if MAC is unassigned
     - deduplication: checks (locationId, frameCounter) within 10s window
     - writes Reading through the configured db adapter
-    - emits Socket.io 'reading' event to all browser clients
+    - emits Socket.io 'reading' only to sockets whose user context can access the location's group
         │
         ├──▶ MongoDB (persistent storage)
         │
@@ -59,7 +61,12 @@ ATC MiThermometer (BLE advertisement)
         │
         └──▶ Browser (Socket.io — live card updates)
                 │
+                ├── GET /api/me
+                │   - resolves the current user context
+                │   - returns visible groups and available users
+                │
                 └── GET /api/history/:locationId  (on page load / range change)
+                      - route is filtered by the current user's accessible groups
                       - Mongo: $bucketAuto aggregation, max 300 buckets
                       - Mock DB: equivalent in-memory bucketing
 ```
@@ -79,9 +86,11 @@ ATC MiThermometer (BLE advertisement)
 | `src/services/readings.js` | Injected reading handler: lookup, dedup, DB write, Socket.io emit |
 | `src/routes/locations.js` | Location CRUD router factory |
 | `src/routes/readings.js` | Current + history query router factory |
+| `src/models/Group.js` | Mongoose schema for access-control groups |
+| `src/models/User.js` | Mongoose schema for users and group membership |
 | `src/models/Location.js` | Mongoose schema for named sensor locations |
 | `src/models/Reading.js` | Mongoose schema for timestamped sensor readings |
-| `public/app.js` | Dashboard UI: cards, charts, location management, theme toggle |
+| `public/app.js` | Dashboard UI: cards, charts, user context switcher, location management, theme toggle |
 
 ## Decisions log
 
@@ -99,6 +108,13 @@ A unique index on `(locationId, frameCounter)` alone was rejected because the co
 Readings store a `locationId` (ObjectId) stamped at ingest time, not the raw MAC. If a sensor is reassigned to a different location, historical readings stay with the original location (they reflect where the sensor physically was). Unassigned MACs are silently dropped.
 
 Deleting a location cascades to delete its readings (clean slate, no orphans).
+
+### Access control: users see locations through groups
+Each location belongs to one group. Users can belong to multiple groups. Read access for current readings, history, location rows, and live Socket.io updates is granted when the location's `groupId` is in the user's `groupIds`.
+
+For now, "current user" is resolved by injected request/socket context rather than a full authentication system. This keeps the authorization model testable while leaving room for real login/session handling later.
+
+Admins are a special case: an admin can access all groups and serves as the default bootstrap user for fresh or migrated MongoDB deployments.
 
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.
