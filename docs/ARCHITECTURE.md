@@ -1,20 +1,17 @@
 # Architecture
 
-## Current state
-
-A monolith. `server.js` handles MQTT subscription, ATC frame parsing, deduplication, DB writes, REST API, and Socket.io — all in one file. `routes/locations.js` is partially extracted.
-
-## Target structure
+## Structure
 
 ```
-server.js               — entry point: wires modules together, starts HTTP server
+server.js               — entry point: HTTP server, Socket.io, MongoDB, MQTT wiring
+app.js                  — Express config: middleware and route mounts (importable without binding a port)
 mqtt/
-  subscriber.js         — MQTT connection, topic subscription, emits parsed 'reading' events
+  subscriber.js         — MQTT connection, topic subscription, emits parsed 'reading' events via EventEmitter
   atc.js                — pure ATC frame decoder (hex → { temperature, humidity, battery, frameCounter })
 services/
-  readings.js           — deduplication check, DB write, Socket.io emit
+  readings.js           — location lookup, deduplication, DB write, Socket.io emit
 routes/
-  locations.js          — CRUD for Location documents (already exists)
+  locations.js          — CRUD for Location documents
   readings.js           — GET /api/current, GET /api/history/:locationId
 models/
   Location.js           — { name, sensorMac }
@@ -22,7 +19,10 @@ models/
 public/
   index.html
   style.css
-  app.js
+  app.js                — dashboard UI: cards, charts, location management, theme toggle
+docs/
+  ARCHITECTURE.md
+  img/
 ```
 
 ## Data flow
@@ -60,7 +60,8 @@ ATC MiThermometer (BLE advertisement)
 
 | File | Responsibility |
 |---|---|
-| `server.js` | Wire modules, start Express + Socket.io + HTTP server |
+| `server.js` | Entry point — HTTP server, Socket.io, MongoDB, MQTT wiring |
+| `app.js` | Express app config — middleware and route mounts, importable without a port |
 | `mqtt/subscriber.js` | MQTT lifecycle, raw message → parsed event via EventEmitter |
 | `mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
 | `services/readings.js` | Location lookup, dedup, DB write, Socket.io emit |
