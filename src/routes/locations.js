@@ -1,4 +1,5 @@
 const express = require('express');
+const { asyncHandler } = require('./async-handler');
 
 function isDuplicateSensorMacError(err) {
   return err && err.code === 11000;
@@ -7,12 +8,12 @@ function isDuplicateSensorMacError(err) {
 function createLocationsRouter({ db }) {
   const router = express.Router();
 
-  router.get('/', async (req, res) => {
+  router.get('/', asyncHandler(async (req, res) => {
     const locations = await db.listLocations(req.userContext);
     res.json(locations);
-  });
+  }));
 
-  router.post('/', async (req, res) => {
+  router.post('/', asyncHandler(async (req, res) => {
     const { name, sensorMac, groupId } = req.body;
     if (!name || !sensorMac || !groupId) return res.status(400).json({ error: 'name, sensorMac, and groupId required' });
 
@@ -24,9 +25,9 @@ function createLocationsRouter({ db }) {
       if (err && err.code === 'FORBIDDEN_GROUP') return res.status(403).json({ error: 'group access denied' });
       throw err;
     }
-  });
+  }));
 
-  router.put('/:id', async (req, res) => {
+  router.put('/:id', asyncHandler(async (req, res) => {
     const { name, sensorMac, groupId } = req.body;
     const update = {};
     if (name) update.name = name;
@@ -42,13 +43,18 @@ function createLocationsRouter({ db }) {
       if (err && err.code === 'FORBIDDEN_GROUP') return res.status(403).json({ error: 'group access denied' });
       throw err;
     }
-  });
+  }));
 
-  router.delete('/:id', async (req, res) => {
-    const deleted = await db.deleteLocation(req.userContext, req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'not found' });
-    res.json({ ok: true });
-  });
+  router.delete('/:id', asyncHandler(async (req, res) => {
+    try {
+      const deleted = await db.deleteLocation(req.userContext, req.params.id);
+      if (!deleted) return res.status(404).json({ error: 'not found' });
+      res.json({ ok: true });
+    } catch (err) {
+      if (err && err.code === 'FORBIDDEN_GROUP') return res.status(403).json({ error: 'group access denied' });
+      throw err;
+    }
+  }));
 
   return router;
 }

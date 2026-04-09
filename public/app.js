@@ -1,14 +1,28 @@
 let socket;
+const authShell = document.getElementById('auth-shell');
+const dashboardShell = document.getElementById('dashboard-shell');
 const statusBadge = document.getElementById('connection-status');
 const cardsContainer = document.getElementById('cards-container');
 const chartsContainer = document.getElementById('charts-container');
 const rangeSelect = document.getElementById('range-select');
 const locationsTbody = document.getElementById('locations-tbody');
 const locationsError = document.getElementById('locations-error');
-const userSelect = document.getElementById('user-select');
+const currentUserName = document.getElementById('current-user-name');
 const userRole = document.getElementById('user-role');
 const groupSummary = document.getElementById('group-summary');
 const newGroupSelect = document.getElementById('new-group');
+const loginUsername = document.getElementById('login-username');
+const loginPassword = document.getElementById('login-password');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const authError = document.getElementById('auth-error');
+const accessSection = document.getElementById('access-section');
+const groupsList = document.getElementById('groups-list');
+const usersTbody = document.getElementById('users-tbody');
+const accessError = document.getElementById('access-error');
+const addGroupBtn = document.getElementById('add-group-btn');
+const addUserBtn = document.getElementById('add-user-btn');
+const newUserGroupsSelect = document.getElementById('new-user-groups');
 
 // { locationId -> card element }
 const cards = {};
@@ -98,32 +112,38 @@ applyTimeFormat(localStorage.getItem('time-format') || 'system');
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  await loadUserContext();
-  await reloadDashboard();
+  applyShellState(false);
+  const loaded = await loadUserContext();
+  if (loaded) await reloadDashboard();
 }
 
 async function loadUserContext() {
   const response = await apiFetch('/api/me');
-  if (response.status === 401 && getCurrentUserId()) {
-    localStorage.removeItem('current-user-id');
-    return loadUserContext();
-  }
+  if (response.status === 401) return false;
   if (!response.ok) {
     throw new Error(`Failed to load user context (${response.status})`);
   }
   const me = await response.json();
-  currentUserContext = me;
-  if (!getCurrentUserId()) localStorage.setItem('current-user-id', me.user._id);
-  renderUserSelect(me);
-  renderGroupOptions(me.groups);
+  await applyAuthenticatedContext(me);
+  return true;
 }
 
-function renderUserSelect(context) {
-  if (!userSelect || !groupSummary) return;
-  userSelect.innerHTML = context.availableUsers
-    .map(user => `<option value="${user._id}">${user.name}${user.role === 'admin' ? ' (Admin)' : ''}</option>`)
-    .join('');
-  userSelect.value = context.user._id;
+async function applyAuthenticatedContext(context) {
+  currentUserContext = context;
+  applyShellState(true);
+  renderCurrentUser(context);
+  renderGroupOptions(context.groups);
+  try {
+    await loadAdminAccess();
+  } catch (err) {
+    console.error('Failed to load admin access UI:', err);
+    setAccessError(err.message || 'Failed to load access management');
+  }
+}
+
+function renderCurrentUser(context) {
+  if (!groupSummary || !currentUserName) return;
+  currentUserName.textContent = context.user.name;
   if (userRole) {
     userRole.textContent = context.user.role === 'admin' ? 'Admin' : 'Member';
     userRole.className = `badge user-role ${context.user.role === 'admin' ? 'connected' : 'disconnected'}`;
@@ -138,6 +158,89 @@ function renderGroupOptions(groups) {
   newGroupSelect.innerHTML = groups
     .map(group => `<option value="${group._id}">${group.name}</option>`)
     .join('');
+}
+
+function applyShellState(isAuthenticated) {
+  authShell.hidden = isAuthenticated;
+  dashboardShell.hidden = !isAuthenticated;
+  if (!isAuthenticated) {
+    statusBadge.textContent = 'Disconnected';
+    statusBadge.className = 'badge disconnected';
+  }
+}
+
+async function loadAdminAccess() {
+  if (!accessSection) return;
+  if (currentUserContext.user.role !== 'admin') {
+    accessSection.hidden = true;
+    groupsList.innerHTML = '';
+    usersTbody.innerHTML = '';
+    setAccessError('');
+    return;
+  }
+
+  const response = await apiFetch('/api/admin/access');
+  if (!response.ok) {
+    throw new Error(`Failed to load access management (${response.status})`);
+  }
+
+  const access = await response.json();
+  accessSection.hidden = false;
+  renderGroupsList(access.groups);
+  renderUsersTable(access.users, access.groups);
+  renderNewUserGroupOptions(access.groups);
+}
+
+function renderGroupsList(groups) {
+  groupsList.innerHTML = groups
+    .map(group => `
+      <div class="group-pill-card">
+        <div class="group-pill-name">${group.name}</div>
+        <div class="group-pill-description">${group.description || 'No description'}</div>
+      </div>
+    `)
+    .join('');
+}
+
+function renderUsersTable(users, groups) {
+  usersTbody.innerHTML = '';
+  users.forEach(user => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = user._id;
+    tr.innerHTML = `
+      <td data-label="Name">${user.name}</td>
+      <td data-label="Username">${user.username}</td>
+      <td data-label="Role">
+        <select class="user-role-input">
+          <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+        </select>
+      </td>
+      <td data-label="Password"><input class="user-password-input" type="password" placeholder="Leave unchanged" /></td>
+      <td data-label="Groups">${renderUserGroupMultiSelect(user.groupIds, groups)}</td>
+      <td data-label="Actions" class="actions"><button class="btn btn-save-user">Save</button></td>
+    `;
+    tr.querySelector('.btn-save-user').addEventListener('click', () => saveUserAccess(tr));
+    usersTbody.appendChild(tr);
+  });
+}
+
+function renderUserGroupMultiSelect(selectedGroupIds, groups) {
+  const options = groups.map(group => `
+    <option value="${group._id}" ${selectedGroupIds.includes(group._id) ? 'selected' : ''}>${group.name}</option>
+  `).join('');
+  return `<select class="user-groups-input" multiple size="${Math.min(Math.max(groups.length, 2), 6)}">${options}</select>`;
+}
+
+function renderNewUserGroupOptions(groups) {
+  newUserGroupsSelect.innerHTML = groups
+    .map(group => `<option value="${group._id}">${group.name}</option>`)
+    .join('');
+  newUserGroupsSelect.size = Math.min(Math.max(groups.length, 2), 6);
+}
+
+function getSelectedValues(select) {
+  return [...select.selectedOptions].map(option => option.value);
 }
 
 function resetDashboardState() {
@@ -483,15 +586,108 @@ document.getElementById('add-location-btn').addEventListener('click', async () =
   await loadLocations();
 });
 
-userSelect.addEventListener('change', async () => {
-  localStorage.setItem('current-user-id', userSelect.value);
+addGroupBtn.addEventListener('click', async () => {
+  const name = document.getElementById('group-name').value.trim();
+  const description = document.getElementById('group-description').value.trim();
+  const response = await apiFetch('/api/admin/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  });
+  if (!response.ok) {
+    setAccessError((await response.json()).error);
+    return;
+  }
+  setAccessError('');
+  document.getElementById('group-name').value = '';
+  document.getElementById('group-description').value = '';
   await loadUserContext();
-  await reloadDashboard();
+  await loadLocations();
 });
+
+addUserBtn.addEventListener('click', async () => {
+  const name = document.getElementById('new-user-name').value.trim();
+  const username = document.getElementById('new-user-username').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const role = document.getElementById('new-user-role').value;
+  const groupIds = getSelectedValues(newUserGroupsSelect);
+  const response = await apiFetch('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, username, password, role, groupIds }),
+  });
+  if (!response.ok) {
+    setAccessError((await response.json()).error);
+    return;
+  }
+  setAccessError('');
+  document.getElementById('new-user-name').value = '';
+  document.getElementById('new-user-username').value = '';
+  document.getElementById('new-user-password').value = '';
+  document.getElementById('new-user-role').value = 'member';
+  [...newUserGroupsSelect.options].forEach(option => {
+    option.selected = false;
+  });
+  await loadUserContext();
+});
+
+async function saveUserAccess(tr) {
+  const role = tr.querySelector('.user-role-input').value;
+  const password = tr.querySelector('.user-password-input').value;
+  const groupIds = getSelectedValues(tr.querySelector('.user-groups-input'));
+  const response = await apiFetch(`/api/admin/users/${tr.dataset.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role, password, groupIds }),
+  });
+  if (!response.ok) {
+    setAccessError((await response.json()).error);
+    return;
+  }
+  setAccessError('');
+  await loadUserContext();
+}
 
 rangeSelect.addEventListener('change', loadAllCharts);
 
 function setError(msg) { locationsError.textContent = msg; }
+function setAccessError(msg) { accessError.textContent = msg; }
+function setAuthError(msg) { authError.textContent = msg; }
+
+loginBtn.addEventListener('click', async () => {
+  try {
+    const response = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: loginUsername.value.trim(),
+        password: loginPassword.value,
+      }),
+    });
+
+    if (!response.ok) {
+      setAuthError((await response.json()).error);
+      return;
+    }
+
+    const context = await response.json();
+    setAuthError('');
+    loginPassword.value = '';
+    await applyAuthenticatedContext(context);
+    await reloadDashboard();
+  } catch (err) {
+    console.error('Login flow failed:', err);
+    setAuthError(err.message || 'Login failed');
+  }
+});
+
+logoutBtn.addEventListener('click', async () => {
+  if (socket) socket.disconnect();
+  await apiFetch('/api/auth/logout', { method: 'POST' });
+  currentUserContext = null;
+  resetDashboardState();
+  applyShellState(false);
+});
 
 function formatTime(ts) {
   if (!ts) return '';
@@ -500,27 +696,22 @@ function formatTime(ts) {
 
 init().catch(err => {
   console.error('Dashboard init failed:', err);
-  statusBadge.textContent = 'Error';
-  statusBadge.className = 'badge disconnected';
-  setError(err.message || 'Failed to initialize dashboard');
+  if (!dashboardShell.hidden) {
+    statusBadge.textContent = 'Error';
+    statusBadge.className = 'badge disconnected';
+    setError(err.message || 'Failed to initialize dashboard');
+  } else {
+    setAuthError(err.message || 'Failed to initialize dashboard');
+  }
 });
-function getCurrentUserId() {
-  return localStorage.getItem('current-user-id') || '';
-}
 
 async function apiFetch(path, options = {}) {
-  const headers = new Headers(options.headers || {});
-  const userId = getCurrentUserId();
-  if (userId) headers.set('x-user-id', userId);
-  const response = await fetch(path, { ...options, headers });
-  return response;
+  return fetch(path, { ...options, credentials: 'same-origin' });
 }
 
 function connectSocket() {
   if (socket) socket.disconnect();
-  socket = io({
-    auth: { userId: getCurrentUserId() || undefined },
-  });
+  socket = io();
 
   socket.on('connect', () => {
     statusBadge.textContent = 'Live';

@@ -16,6 +16,10 @@ function getConfig(env = process.env) {
     port: parseInteger(env.PORT, 3000),
     chartBuckets: parseInteger(env.CHART_BUCKETS, 300),
     mockIntervalMs: parseInteger(env.MOCK_INTERVAL_MS, 5000),
+    sessionSecret: env.SESSION_SECRET || 'local-dashboard-dev-secret',
+    allowUserOverride: env.ALLOW_USER_OVERRIDE === 'true' || appMode === 'test',
+    defaultAdminPassword: env.DEFAULT_ADMIN_PASSWORD || 'admin',
+    defaultUserPassword: env.DEFAULT_USER_PASSWORD || env.DEFAULT_ADMIN_PASSWORD || 'changeme',
   };
 }
 

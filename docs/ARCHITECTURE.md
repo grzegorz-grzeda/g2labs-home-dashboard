@@ -6,6 +6,7 @@
 src/
   server.js             — entry point and composition root: HTTP server, Socket.io, db, reading source wiring
   app.js                — Express app factory: middleware and route mounts with injected dependencies
+  auth.js               — password hashing and signed session cookie helpers
   config.js             — env parsing and runtime mode selection
   adapters/
     db/
@@ -18,17 +19,18 @@ src/
   services/
     readings.js         — injected reading handler: location lookup, deduplication, DB write, Socket.io emit
   routes/
+    admin.js            — admin-only router factory for groups and user access management
     locations.js        — location CRUD router factory
     readings.js         — readings query router factory
   models/
     Group.js            — { name, description }
-    User.js             — { name, username, role, groupIds[] }
+    User.js             — { name, username, passwordHash, role, groupIds[] }
     Location.js         — { name, sensorMac, groupId }
     Reading.js          — { locationId, temperature, humidity, battery, rssi, frameCounter, timestamp }
 public/
   index.html
   style.css
-  app.js                — dashboard UI: cards, charts, user context switcher, location management, theme toggle
+  app.js                — dashboard UI: login/logout, cards, charts, access management, location management, theme toggle
 docs/
   ARCHITECTURE.md
   img/
@@ -61,9 +63,15 @@ ATC MiThermometer (BLE advertisement)
         │
         └──▶ Browser (Socket.io — live card updates)
                 │
+                ├── POST /api/auth/login
+                │   - verifies credentials and sets a signed session cookie
+                │
                 ├── GET /api/me
                 │   - resolves the current user context
-                │   - returns visible groups and available users
+                │   - returns the authenticated user and visible groups
+                │
+                ├── /api/admin/*
+                │   - admin-only group and user management
                 │
                 └── GET /api/history/:locationId  (on page load / range change)
                       - route is filtered by the current user's accessible groups
@@ -77,6 +85,7 @@ ATC MiThermometer (BLE advertisement)
 |---|---|
 | `src/server.js` | Entry point and composition root — injects db + reading source adapters |
 | `src/app.js` | Express app factory — middleware and route mounts with injected dependencies |
+| `src/auth.js` | Password hashing and signed session cookie helpers |
 | `src/config.js` | Runtime config and mode selection |
 | `src/adapters/db/mongo.js` | Mongo-backed db adapter |
 | `src/adapters/db/mock.js` | In-memory db adapter for test/demo mode |
@@ -84,13 +93,14 @@ ATC MiThermometer (BLE advertisement)
 | `src/mqtt/mock-generator.js` | Synthetic reading source for tests and local demos |
 | `src/mqtt/atc.js` | Decode ATC custom advertisement hex (pure function, no side effects) |
 | `src/services/readings.js` | Injected reading handler: lookup, dedup, DB write, Socket.io emit |
+| `src/routes/admin.js` | Admin-only router for groups and user membership management |
 | `src/routes/locations.js` | Location CRUD router factory |
 | `src/routes/readings.js` | Current + history query router factory |
 | `src/models/Group.js` | Mongoose schema for access-control groups |
 | `src/models/User.js` | Mongoose schema for users and group membership |
 | `src/models/Location.js` | Mongoose schema for named sensor locations |
 | `src/models/Reading.js` | Mongoose schema for timestamped sensor readings |
-| `public/app.js` | Dashboard UI: cards, charts, user context switcher, location management, theme toggle |
+| `public/app.js` | Dashboard UI: login/logout, cards, charts, access management, location management, theme toggle |
 
 ## Decisions log
 
@@ -112,9 +122,17 @@ Deleting a location cascades to delete its readings (clean slate, no orphans).
 ### Access control: users see locations through groups
 Each location belongs to one group. Users can belong to multiple groups. Read access for current readings, history, location rows, and live Socket.io updates is granted when the location's `groupId` is in the user's `groupIds`.
 
-For now, "current user" is resolved by injected request/socket context rather than a full authentication system. This keeps the authorization model testable while leaving room for real login/session handling later.
+The current user is resolved through a signed session cookie shared by HTTP requests and Socket.io handshakes. Test mode can optionally allow explicit user overrides for debugging, but the standard user flow is authenticated login.
 
 Admins are a special case: an admin can access all groups and serves as the default bootstrap user for fresh or migrated MongoDB deployments.
+
+### Admin operations: manage access from the dashboard
+The dashboard includes an admin-only Access Management section. It is backed by `/api/admin/access`, `/api/admin/groups`, and `/api/admin/users*`. Admins can create groups, create users, and update a user's role or group membership without editing Mongo documents directly.
+
+### Authentication: local credentials, signed cookies
+Passwords are stored as salted `scrypt` hashes. Successful login returns an HTTP-only signed cookie. That cookie is the single source of truth for both API authorization and live Socket.io subscriptions, which keeps browser refreshes and websocket reconnects consistent without a separate session store.
+
+The test suite includes direct HTTP integration coverage for `401` and `403` access-control behavior in addition to UI-level Playwright flows.
 
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.

@@ -40,21 +40,24 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Locations belong to exactly one group.
 - Users can belong to multiple groups.
 - Users have a role; admin users can access all groups.
+- Users authenticate with username/password and a signed cookie-backed session.
 - Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
+- Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
+- Preserve the admin Access Management UI when changing user context, groups, or location assignment flows.
 
 ## Frontend conventions
 
 - Prefer existing CSS custom properties for theme-aware UI surfaces.
 - When chart UI colors should react to theme changes, read them from CSS variables via `cssVar()`.
 - Keep the dashboard usable on small screens; preserve responsive behavior when changing layouts, cards, tables, or charts.
-- Preserve the user context controls when changing the header or location management UI.
+- Preserve the login/logout flow and authenticated user context controls when changing the header or location management UI.
 
 ## Verification
 
 - After changing code, run a relevant verification step before handoff. Treat this as required, not optional.
 - Run the narrowest useful check that gives confidence in the changed area.
 - For server changes, at minimum verify the app still starts with `npm start` or `npm run dev`.
-- For UI changes, run `npm run test:ui` when the affected behavior is covered by Playwright. If not, verify the affected screen in both desktop and mobile-sized layouts when possible.
+- For UI changes, prefer `npm test` so unit and Playwright coverage stay aligned. If Playwright does not cover the affected behavior, also verify the affected screen in both desktop and mobile-sized layouts when possible.
 - If a meaningful verification step could not be run, say so clearly in the handoff and explain why.
 
 ## Commit guidance

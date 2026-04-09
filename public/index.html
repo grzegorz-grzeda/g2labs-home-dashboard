@@ -10,72 +10,137 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>Home Dashboard</h1>
-    <div id="connection-status" class="badge disconnected">Disconnected</div>
-    <div class="user-context">
-      <label for="user-select">User</label>
-      <select id="user-select"></select>
-      <div id="user-role" class="badge user-role"></div>
-      <div id="group-summary" class="group-summary"></div>
+  <section id="auth-shell" class="auth-shell" hidden>
+    <div class="auth-card">
+      <h1>Home Dashboard</h1>
+      <p class="auth-subtitle">Sign in to view your assigned locations and live readouts.</p>
+      <div class="stacked-form">
+        <input id="login-username" type="text" placeholder="Username" autocomplete="username" />
+        <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
+        <button id="login-btn" class="btn btn-add">Sign In</button>
+      </div>
+      <p id="auth-error" class="error-msg"></p>
     </div>
-    <div id="time-format-toggle" class="theme-toggle time-format-toggle" title="Clock format">
-      <button data-time-format="system">System</button>
-      <button data-time-format="24h">24h</button>
-      <button data-time-format="12h">12h</button>
-    </div>
-    <div id="theme-toggle" class="theme-toggle" title="Toggle theme">
-      <button data-theme="light">☀</button>
-      <button data-theme="system">⬤</button>
-      <button data-theme="dark">☾</button>
-    </div>
-  </header>
-
-  <section id="current-readings">
-    <h2>Current Readings</h2>
-    <div id="cards-container"></div>
   </section>
 
-  <section id="history-section">
-    <h2>History</h2>
-    <div class="controls">
-      <label>Range:
-        <select id="range-select">
-          <option value="6">Last 6 h</option>
-          <option value="24" selected>Last 24 h</option>
-          <option value="72">Last 3 days</option>
-          <option value="168">Last 7 days</option>
-        </select>
-      </label>
-    </div>
-    <div id="charts-container"></div>
-  </section>
+  <main id="dashboard-shell" hidden>
+    <header>
+      <h1>Home Dashboard</h1>
+      <div id="connection-status" class="badge disconnected">Disconnected</div>
+      <div class="user-context">
+        <span class="user-context-label">User</span>
+        <div id="current-user-name" class="user-name"></div>
+        <div id="user-role" class="badge user-role"></div>
+        <div id="group-summary" class="group-summary"></div>
+      </div>
+      <button id="logout-btn" class="btn btn-cancel">Log Out</button>
+      <div id="time-format-toggle" class="theme-toggle time-format-toggle" title="Clock format">
+        <button data-time-format="system">System</button>
+        <button data-time-format="24h">24h</button>
+        <button data-time-format="12h">12h</button>
+      </div>
+      <div id="theme-toggle" class="theme-toggle" title="Toggle theme">
+        <button data-theme="light">☀</button>
+        <button data-theme="system">⬤</button>
+        <button data-theme="dark">☾</button>
+      </div>
+    </header>
 
-  <section id="locations-section">
-    <h2>Locations</h2>
-    <div class="table-scroll">
-      <table id="locations-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Sensor MAC</th>
-            <th>Group</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="locations-tbody"></tbody>
-        <tfoot>
-          <tr>
-            <td data-label="Name"><input id="new-name" type="text" placeholder="Room name" /></td>
-            <td data-label="Sensor MAC"><input id="new-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" /></td>
-            <td data-label="Group"><select id="new-group"></select></td>
-            <td data-label="Actions"><button id="add-location-btn" class="btn btn-add">Add</button></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <p id="locations-error" class="error-msg"></p>
-  </section>
+    <section id="current-readings">
+      <h2>Current Readings</h2>
+      <div id="cards-container"></div>
+    </section>
+
+    <section id="history-section">
+      <h2>History</h2>
+      <div class="controls">
+        <label>Range:
+          <select id="range-select">
+            <option value="6">Last 6 h</option>
+            <option value="24" selected>Last 24 h</option>
+            <option value="72">Last 3 days</option>
+            <option value="168">Last 7 days</option>
+          </select>
+        </label>
+      </div>
+      <div id="charts-container"></div>
+    </section>
+
+    <section id="locations-section">
+      <h2>Locations</h2>
+      <div class="table-scroll">
+        <table id="locations-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Sensor MAC</th>
+              <th>Group</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="locations-tbody"></tbody>
+          <tfoot>
+            <tr>
+              <td data-label="Name"><input id="new-name" type="text" placeholder="Room name" /></td>
+              <td data-label="Sensor MAC"><input id="new-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" /></td>
+              <td data-label="Group"><select id="new-group"></select></td>
+              <td data-label="Actions"><button id="add-location-btn" class="btn btn-add">Add</button></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p id="locations-error" class="error-msg"></p>
+    </section>
+
+    <section id="access-section" hidden>
+      <h2>Access Management</h2>
+      <div class="access-grid">
+        <div class="access-panel">
+          <h3>Groups</h3>
+          <div id="groups-list" class="groups-list"></div>
+          <div class="stacked-form">
+            <input id="group-name" type="text" placeholder="Group name" />
+            <input id="group-description" type="text" placeholder="Description (optional)" />
+            <button id="add-group-btn" class="btn btn-add">Create Group</button>
+          </div>
+        </div>
+        <div class="access-panel">
+          <h3>Users</h3>
+          <div class="table-scroll">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Password</th>
+                  <th>Groups</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody"></tbody>
+              <tfoot>
+                <tr>
+                  <td data-label="Name"><input id="new-user-name" type="text" placeholder="Full name" /></td>
+                  <td data-label="Username"><input id="new-user-username" type="text" placeholder="username" /></td>
+                  <td data-label="Role">
+                    <select id="new-user-role">
+                      <option value="member">Member</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td data-label="Password"><input id="new-user-password" type="password" placeholder="Password" /></td>
+                  <td data-label="Groups"><select id="new-user-groups" multiple size="4"></select></td>
+                  <td data-label="Actions"><button id="add-user-btn" class="btn btn-add">Add User</button></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p id="access-error" class="error-msg"></p>
+    </section>
+  </main>
 
   <script src="app.js"></script>
 </body>

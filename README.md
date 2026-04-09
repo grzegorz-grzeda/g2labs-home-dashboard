@@ -9,6 +9,8 @@ A local web dashboard for ATC MiThermometer BLE sensor data. Subscribes to MQTT 
 - Parses ATC custom advertisement format from blester MQTT payloads
 - Group-aware location management — assign sensor MACs to named rooms and groups via the UI
 - User context with group-based access control for location readouts
+- Admin access management for groups, roles, and user membership
+- Local username/password login with cookie-backed sessions
 - Historical charts with automatic resolution scaling (`$bucketAuto`) across any time range
 - Shared y-axis scales across all location charts with ±5 padding
 - Real-time card updates via Socket.io
@@ -48,6 +50,10 @@ Note: `.env.example` is a sample local-network configuration. If you omit a vari
 | `PORT` | `3000` | HTTP port |
 | `CHART_BUCKETS` | `300` | Max data points per chart (aggregated by MongoDB) |
 | `MOCK_INTERVAL_MS` | `5000` | Reading interval for the mock generator in test mode |
+| `SESSION_SECRET` | `local-dashboard-dev-secret` | HMAC secret used to sign session cookies |
+| `DEFAULT_ADMIN_PASSWORD` | `admin` | Bootstrap password for the auto-created default admin |
+| `DEFAULT_USER_PASSWORD` | `changeme` | Password used when backfilling legacy users without a password |
+| `ALLOW_USER_OVERRIDE` | `true` in test mode, otherwise `false` | Allows `x-user-id` override for API/socket debugging |
 
 ## Running
 
@@ -77,7 +83,7 @@ In test mode:
 - the database dependency is injected as an in-memory mock adapter
 - the MQTT dependency is injected as a generated reading source
 - the dashboard still uses the same HTTP routes and Socket.io updates as production
-- seeded users and groups are available through the header user switcher so access filtering can be exercised without real auth
+- seeded users and groups are available through the login form for auth and access-control testing
 
 ## UI testing
 
@@ -104,32 +110,40 @@ APP_MODE=test PORT=4173 MOCK_INTERVAL_MS=250 npm start
 
 Current coverage includes:
 
+- API-level authentication and authorization responses
 - dashboard smoke test for seeded cards and charts
+- login flow with persisted authenticated sessions
 - clock format toggle behavior
 - location CRUD flow in the mock DB
-- user switching and group-based access filtering
+- member login and group-based access filtering
+- admin group and membership management flow
 - mobile viewport smoke test
 
-## User and group access
+## Authentication and access
 
 Locations belong to a single group. Users can belong to one or more groups. A user can view current readings, historical charts, and location rows only for locations assigned to one of their groups.
 
-The current implementation uses request and socket user context rather than full login/session auth:
+The current implementation uses local username/password authentication with signed cookie sessions:
 
-- HTTP requests resolve the current user from the `x-user-id` header when provided
-- Socket.io connections resolve the current user from the client auth payload
-- if no explicit user is supplied, the default user is used
+- `POST /api/auth/login` verifies credentials and sets an HTTP-only session cookie
+- HTTP requests resolve the current user from that cookie
+- Socket.io connections resolve the current user from the same cookie during the handshake
+- `ALLOW_USER_OVERRIDE=true` can still be used in test mode for request/socket debugging
+- admins get an Access Management section in the UI for creating groups, creating users, and updating user roles/group membership
 
 In test mode, the seeded users are:
 
-- `Grzegorz` as an `admin`, with access to all groups
-- `Anna` with access to `Family`
+- `Grzegorz` / password `grzegorz` as an `admin`, with access to all groups
+- `Anna` / password `anna` with access to `Family`
 
 Default Mongo bootstrap behavior:
 
 - if no groups exist, the app creates `Default Home`
-- if no users exist, the app creates `Default Admin` with username `admin` and role `admin`
+- if no users exist, the app creates `Default Admin` with username `admin`, role `admin`, and password from `DEFAULT_ADMIN_PASSWORD`
 - existing locations without a `groupId` are assigned to `Default Home`
+- users missing `groupIds` are backfilled to `Default Home`
+- users missing `passwordHash` are backfilled to `DEFAULT_USER_PASSWORD`
+- if no admin exists, the first user is promoted to `admin`
 
 ## Data flow
 

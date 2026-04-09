@@ -1,3 +1,5 @@
+const { hashPassword, verifyPassword } = require('../../auth');
+
 function createIdGenerator() {
   let counter = 1;
   return () => `mock-${counter++}`;
@@ -15,6 +17,24 @@ function forbiddenGroupError() {
   return err;
 }
 
+function forbiddenAdminError() {
+  const err = new Error('admin access required');
+  err.code = 'FORBIDDEN_ADMIN';
+  return err;
+}
+
+function duplicateGroupError() {
+  const err = new Error('group name already exists');
+  err.code = 'DUPLICATE_GROUP';
+  return err;
+}
+
+function duplicateUsernameError() {
+  const err = new Error('username already exists');
+  err.code = 11000;
+  return err;
+}
+
 function userNotFoundError() {
   const err = new Error('unknown user context');
   err.code = 'USER_NOT_FOUND';
@@ -23,6 +43,10 @@ function userNotFoundError() {
 
 function normalizeSensorMac(sensorMac) {
   return sensorMac.toUpperCase();
+}
+
+function ensureAdmin(userContext) {
+  if (userContext.role !== 'admin') throw forbiddenAdminError();
 }
 
 function average(values) {
@@ -96,6 +120,7 @@ function createSeedUsers(makeId, groups) {
       _id: makeId(),
       name: 'Grzegorz',
       username: 'grzegorz',
+      passwordHash: hashPassword('grzegorz'),
       role: 'admin',
       groupIds: [familyGroup._id, garageGroup._id],
     },
@@ -103,6 +128,7 @@ function createSeedUsers(makeId, groups) {
       _id: makeId(),
       name: 'Anna',
       username: 'anna',
+      passwordHash: hashPassword('anna'),
       role: 'member',
       groupIds: [familyGroup._id],
     },
@@ -149,6 +175,7 @@ function createMockDb({ initialGroups, initialUsers, initialLocations, initialRe
     groups: groups.map(group => ({ ...group })),
     users: (initialUsers || createSeedUsers(makeId, groups)).map(user => ({
       ...user,
+      passwordHash: user.passwordHash || hashPassword(user.username),
       groupIds: [...user.groupIds],
     })),
     locations: hydratedLocations.map(location => ({
@@ -181,7 +208,14 @@ function createMockDb({ initialGroups, initialUsers, initialLocations, initialRe
       return buildUserContext(selectedUser, state.groups);
     },
 
-    async listUsers() {
+    async authenticateUser(username, password) {
+      const user = state.users.find(entry => entry.username === username.trim());
+      if (!user || !verifyPassword(password, user.passwordHash)) return null;
+      return buildUserContext(user, state.groups);
+    },
+
+    async listUsers(userContext) {
+      if (userContext) ensureAdmin(userContext);
       return state.users.map(user => ({
         _id: user._id,
         name: user.name,
@@ -192,6 +226,68 @@ function createMockDb({ initialGroups, initialUsers, initialLocations, initialRe
           .filter(group => user.groupIds.includes(group._id))
           .map(group => ({ _id: group._id, name: group.name })),
       }));
+    },
+
+    async listGroups(userContext) {
+      if (userContext) ensureAdmin(userContext);
+      return state.groups.map(group => ({ ...group }));
+    },
+
+    async createGroup(userContext, { name, description = '' }) {
+      ensureAdmin(userContext);
+      const trimmedName = name.trim();
+      if (state.groups.some(group => group.name === trimmedName)) throw duplicateGroupError();
+      const group = {
+        _id: makeId(),
+        name: trimmedName,
+        description: description.trim(),
+      };
+      state.groups.push(group);
+      return { ...group };
+    },
+
+    async createUser(userContext, { name, username, password, role = 'member', groupIds }) {
+      ensureAdmin(userContext);
+      if (state.users.some(user => user.username === username.trim())) throw duplicateUsernameError();
+      const user = {
+        _id: makeId(),
+        name: name.trim(),
+        username: username.trim(),
+        passwordHash: hashPassword(password),
+        role,
+        groupIds: [...groupIds],
+      };
+      state.users.push(user);
+      return {
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        groupIds: [...user.groupIds],
+        groups: state.groups
+          .filter(group => user.groupIds.includes(group._id))
+          .map(group => ({ _id: group._id, name: group.name })),
+      };
+    },
+
+    async updateUser(userContext, id, update) {
+      ensureAdmin(userContext);
+      const user = state.users.find(entry => entry._id === id);
+      if (!user) return null;
+      if (update.name) user.name = update.name.trim();
+      if (update.role) user.role = update.role;
+      if (update.groupIds) user.groupIds = [...update.groupIds];
+      if (update.password) user.passwordHash = hashPassword(update.password);
+      return {
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        groupIds: [...user.groupIds],
+        groups: state.groups
+          .filter(group => user.groupIds.includes(group._id))
+          .map(group => ({ _id: group._id, name: group.name })),
+      };
     },
 
     async listLocations(userContext) {

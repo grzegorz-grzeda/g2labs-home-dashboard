@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { hashPassword, verifyPassword } = require('../../auth');
 const Group = require('../../models/Group');
 const Location = require('../../models/Location');
 const Reading = require('../../models/Reading');
@@ -11,6 +12,18 @@ function normalizeSensorMac(sensorMac) {
 function forbiddenGroupError() {
   const err = new Error('group access denied');
   err.code = 'FORBIDDEN_GROUP';
+  return err;
+}
+
+function forbiddenAdminError() {
+  const err = new Error('admin access required');
+  err.code = 'FORBIDDEN_ADMIN';
+  return err;
+}
+
+function duplicateGroupError() {
+  const err = new Error('group name already exists');
+  err.code = 'DUPLICATE_GROUP';
   return err;
 }
 
@@ -55,6 +68,10 @@ function serializeUser(user, groupIds) {
   };
 }
 
+function ensureAdmin(userContext) {
+  if (userContext.role !== 'admin') throw forbiddenAdminError();
+}
+
 function extractGroupIds(groupsOrIds) {
   return (groupsOrIds || []).map(groupOrId => {
     if (groupOrId?._id) return groupOrId._id.toString();
@@ -81,7 +98,7 @@ async function buildUserContext(user) {
   };
 }
 
-async function ensureDefaultAccessContext() {
+async function ensureDefaultAccessContext({ defaultAdminPassword, defaultUserPassword }) {
   let defaultGroup = await Group.findOne({ name: 'Default Home' });
   if (!defaultGroup) {
     defaultGroup = await Group.create({
@@ -98,6 +115,17 @@ async function ensureDefaultAccessContext() {
       ],
     },
     { $set: { groupId: defaultGroup._id } }
+  );
+
+  await User.updateMany(
+    {
+      $or: [
+        { passwordHash: { $exists: false } },
+        { passwordHash: null },
+        { passwordHash: '' },
+      ],
+    },
+    { $set: { passwordHash: hashPassword(defaultUserPassword) } }
   );
 
   await User.updateMany(
@@ -125,6 +153,7 @@ async function ensureDefaultAccessContext() {
     await User.create({
       name: 'Default Admin',
       username: 'admin',
+      passwordHash: hashPassword(defaultAdminPassword),
       role: 'admin',
       groupIds: [defaultGroup._id],
     });
@@ -144,11 +173,11 @@ async function ensureDefaultAccessContext() {
   }
 }
 
-function createMongoDb({ connectionString }) {
+function createMongoDb({ connectionString, defaultAdminPassword, defaultUserPassword }) {
   return {
     async connect() {
       await mongoose.connect(connectionString);
-      await ensureDefaultAccessContext();
+      await ensureDefaultAccessContext({ defaultAdminPassword, defaultUserPassword });
     },
 
     async disconnect() {
@@ -168,7 +197,14 @@ function createMongoDb({ connectionString }) {
       return buildUserContext(user);
     },
 
-    async listUsers() {
+    async authenticateUser(username, password) {
+      const user = await User.findOne({ username }).populate('groupIds').lean();
+      if (!user || !verifyPassword(password, user.passwordHash)) return null;
+      return buildUserContext(user);
+    },
+
+    async listUsers(userContext) {
+      if (userContext) ensureAdmin(userContext);
       const users = await User.find().populate('groupIds').lean();
       return users.map(user => ({
         _id: user._id.toString(),
@@ -181,6 +217,65 @@ function createMongoDb({ connectionString }) {
           name: group.name || '',
         })),
       }));
+    },
+
+    async listGroups(userContext) {
+      if (userContext) ensureAdmin(userContext);
+      const groups = await Group.find().lean();
+      return serializeGroups(groups);
+    },
+
+    async createGroup(userContext, { name, description = '' }) {
+      ensureAdmin(userContext);
+      const trimmedName = name.trim();
+      const existing = await Group.findOne({ name: trimmedName }).lean();
+      if (existing) throw duplicateGroupError();
+      const group = await Group.create({
+        name: trimmedName,
+        description: description.trim(),
+      });
+      return {
+        _id: group._id.toString(),
+        name: group.name,
+        description: group.description || '',
+      };
+    },
+
+    async createUser(userContext, { name, username, password, role = 'member', groupIds }) {
+      ensureAdmin(userContext);
+      const user = await User.create({
+        name: name.trim(),
+        username: username.trim(),
+        passwordHash: hashPassword(password),
+        role,
+        groupIds,
+      });
+      return serializeUser(user, extractGroupIds(groupIds));
+    },
+
+    async updateUser(userContext, id, update) {
+      ensureAdmin(userContext);
+      const patch = {};
+      if (update.name) patch.name = update.name.trim();
+      if (update.role) patch.role = update.role;
+      if (update.groupIds) patch.groupIds = update.groupIds;
+      if (update.password) patch.passwordHash = hashPassword(update.password);
+      const user = await User.findByIdAndUpdate(id, patch, {
+        new: true,
+        runValidators: true,
+      }).populate('groupIds').lean();
+      if (!user) return null;
+      return {
+        _id: user._id.toString(),
+        name: user.name,
+        username: user.username,
+        role: user.role || 'member',
+        groupIds: extractGroupIds(user.groupIds),
+        groups: (user.groupIds || []).map(group => ({
+          _id: group._id ? group._id.toString() : group.toString(),
+          name: group.name || '',
+        })),
+      };
     },
 
     async listLocations(userContext) {
