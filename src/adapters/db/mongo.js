@@ -62,12 +62,15 @@ function extractGroupIds(groupsOrIds) {
   });
 }
 
+function getVisibleGroupsForUser(user, allGroups) {
+  if ((user.role || 'member') === 'admin') return allGroups;
+  const userGroupIds = extractGroupIds(user.groupIds);
+  return allGroups.filter(group => userGroupIds.includes(group._id.toString()));
+}
+
 async function buildUserContext(user) {
   const allGroups = await Group.find().lean();
-  const userGroupIds = extractGroupIds(user.groupIds);
-  const visibleGroups = (user.role || 'member') === 'admin'
-    ? allGroups
-    : allGroups.filter(group => userGroupIds.includes(group._id.toString()));
+  const visibleGroups = getVisibleGroupsForUser(user, allGroups);
   const groupIds = visibleGroups.map(group => group._id.toString());
 
   return {
@@ -286,4 +289,11 @@ function createMongoDb({ connectionString }) {
   };
 }
 
-module.exports = { createMongoDb };
+module.exports = {
+  createMongoDb,
+  __testables: {
+    extractGroupIds,
+    getVisibleGroupsForUser,
+    hasGroupAccess,
+  },
+};

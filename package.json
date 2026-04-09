@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "test": "npm run test:unit && npm run test:ui",
+    "test:unit": "node --test tests/unit",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
     "test:ui:debug": "playwright test --debug"

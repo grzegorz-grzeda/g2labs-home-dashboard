@@ -1,4 +1,4 @@
-name: Playwright UI Tests
+name: Test Suite
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  playwright:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -27,8 +27,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright UI tests
-        run: npm run test:ui
+      - name: Run full test suite
+        run: npm test
         env:
           CI: true
 

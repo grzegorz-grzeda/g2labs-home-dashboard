@@ -86,6 +86,13 @@ Playwright smoke tests can run against the injected mock mode, so the browser ex
 ```bash
 npm install
 npx playwright install
+npm test
+```
+
+Or run the suites individually:
+
+```bash
+npm run test:unit
 npm run test:ui
 ```
 
