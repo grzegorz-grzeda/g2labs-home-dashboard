@@ -36,6 +36,7 @@ frontend/
 frontend-dist/          — generated client build served by Express (gitignored)
 docs/
   ARCHITECTURE.md
+  API.md
   img/
 ```
 
@@ -144,6 +145,8 @@ The browser UI is now a dedicated React application under `frontend/`. Express s
 
 ### API contract: shared parsers between frontend and backend
 The project uses shared contract parsers in `shared/contracts/`. Routes validate incoming request bodies and validate outgoing response shapes before sending JSON. The React frontend consumes the same contract layer through a small API client, which keeps both sides aligned on payload structure and error codes.
+
+`docs/API.md` is the human-readable companion to that contract layer and must be kept in sync when endpoints, payloads, auth rules, or error codes change.
 
 ### Architecture: layered monolith, not microservices
 Single Node.js process. Modules communicate via a Node.js EventEmitter, not a message queue. This is sufficient for a local home dashboard with a handful of sensors. The layering (mqtt → service → routes) provides testability and clear ownership without the operational overhead of separate services.

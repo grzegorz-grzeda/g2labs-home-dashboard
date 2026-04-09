@@ -119,6 +119,7 @@ The browser UI now lives in a dedicated React/Vite project:
 - `frontend/` contains the source app
 - `frontend-dist/` contains the generated build output
 - Express serves the compiled frontend from `frontend-dist/`
+- [docs/API.md](docs/API.md) documents the HTTP contract used between the React app and the backend
 
 Current coverage includes:
 

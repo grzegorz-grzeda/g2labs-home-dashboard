@@ -10,6 +10,7 @@ Read only the files relevant to the area you are changing:
 - Read [src/mqtt/](src/mqtt/) when changing ATC parsing or MQTT topic handling.
 - Read [src/services/](src/services/) when changing deduplication, DB writes, or socket emission.
 - Read [src/routes/](src/routes/) when changing HTTP endpoints.
+- Read [docs/API.md](docs/API.md) and [shared/contracts/](shared/contracts/) when changing API endpoints, request/response payloads, error codes, or authentication behavior.
 - Read [frontend/](frontend/) when changing dashboard UI behavior, theming, or responsive layout.
 
 ## Running the project
@@ -44,6 +45,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 - Location and reading visibility must always be filtered through the current user's accessible groups for both HTTP responses and live Socket.io updates.
 - Preserve explicit `401`/`403` API behavior when changing authentication or authorization code.
 - Preserve the shared contract layer in `shared/contracts/` when changing API request/response shapes.
+- Preserve `docs/API.md` as the human-readable API contract. If API behavior changes, update it in the same change.
 - Preserve the admin Access Management UI when changing user context, groups, or location assignment flows.
 - Keep the React SPA buildable through Vite and compatible with Express serving the built assets from `frontend-dist/`.
 
@@ -58,6 +60,7 @@ The intended flow is `mqtt/` -> `services/` -> `routes/`, with event-based coord
 
 - After changing code, run a relevant verification step before handoff. Treat this as required, not optional.
 - Run the narrowest useful check that gives confidence in the changed area.
+- When code edits change API routes, contracts, auth rules, or error behavior, also check whether [docs/API.md](docs/API.md) needs an update and make that update before handoff. Treat this as mandatory, not optional.
 - For server changes, at minimum verify the app still starts with `npm start` or `npm run dev`.
 - For UI changes, prefer `npm test` so unit and Playwright coverage stay aligned. If Playwright does not cover the affected behavior, also verify the affected screen in both desktop and mobile-sized layouts when possible.
 - If a meaningful verification step could not be run, say so clearly in the handoff and explain why.
