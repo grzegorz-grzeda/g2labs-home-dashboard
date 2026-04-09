@@ -42,23 +42,25 @@
 
   <section id="locations-section">
     <h2>Locations</h2>
-    <table id="locations-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Sensor MAC</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="locations-tbody"></tbody>
-      <tfoot>
-        <tr>
-          <td><input id="new-name" type="text" placeholder="Room name" /></td>
-          <td><input id="new-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" /></td>
-          <td><button id="add-location-btn" class="btn btn-add">Add</button></td>
-        </tr>
-      </tfoot>
-    </table>
+    <div class="table-scroll">
+      <table id="locations-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Sensor MAC</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="locations-tbody"></tbody>
+        <tfoot>
+          <tr>
+            <td data-label="Name"><input id="new-name" type="text" placeholder="Room name" /></td>
+            <td data-label="Sensor MAC"><input id="new-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" /></td>
+            <td data-label="Actions"><button id="add-location-btn" class="btn btn-add">Add</button></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
     <p id="locations-error" class="error-msg"></p>
   </section>
 

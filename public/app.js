@@ -286,9 +286,9 @@ function renderLocationsTable(locations) {
     const tr = document.createElement('tr');
     tr.dataset.id = loc._id;
     tr.innerHTML = `
-      <td><span class="cell-text">${loc.name}</span><input class="cell-input" type="text" value="${loc.name}" style="display:none" /></td>
-      <td><span class="cell-text">${loc.sensorMac}</span><input class="cell-input" type="text" value="${loc.sensorMac}" style="display:none" /></td>
-      <td class="actions">
+      <td data-label="Name"><span class="cell-text">${loc.name}</span><input class="cell-input" type="text" value="${loc.name}" style="display:none" /></td>
+      <td data-label="Sensor MAC"><span class="cell-text">${loc.sensorMac}</span><input class="cell-input" type="text" value="${loc.sensorMac}" style="display:none" /></td>
+      <td class="actions" data-label="Actions">
         <button class="btn btn-edit">Edit</button>
         <button class="btn btn-save" style="display:none">Save</button>
         <button class="btn btn-cancel" style="display:none">Cancel</button>

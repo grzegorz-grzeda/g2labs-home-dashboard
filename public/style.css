@@ -48,12 +48,15 @@ body {
   background: var(--bg);
   color: var(--text);
   padding: 1.5rem;
+  max-width: 1440px;
+  margin: 0 auto;
   transition: background 0.2s, color 0.2s;
 }
 
 header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -107,8 +110,8 @@ section { margin-bottom: 2.5rem; }
 
 /* ── Cards ───────────────────────────────────────────────────────────────── */
 #cards-container {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
@@ -117,7 +120,7 @@ section { margin-bottom: 2.5rem; }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.2rem 1.5rem;
-  min-width: 200px;
+  min-width: 0;
   transition: border-color 0.3s, background 0.2s;
 }
 
@@ -186,7 +189,7 @@ section { margin-bottom: 2.5rem; }
 /* ── Charts ──────────────────────────────────────────────────────────────── */
 #charts-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 1rem;
 }
 
@@ -195,6 +198,7 @@ section { margin-bottom: 2.5rem; }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.2rem;
+  min-width: 0;
 }
 
 .chart-title {
@@ -209,6 +213,10 @@ section { margin-bottom: 2.5rem; }
 .chart-box canvas { max-height: 200px; }
 
 /* ── Locations table ─────────────────────────────────────────────────────── */
+.table-scroll {
+  width: 100%;
+}
+
 #locations-table {
   width: 100%;
   border-collapse: collapse;
@@ -258,6 +266,152 @@ section { margin-bottom: 2.5rem; }
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: 1rem;
+  }
+
+  header {
+    align-items: flex-start;
+  }
+
+  .theme-toggle {
+    margin-left: 0;
+  }
+
+  .controls {
+    gap: 0.75rem;
+  }
+
+  .controls label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .controls select {
+    width: min(220px, 100%);
+  }
+
+  .card {
+    padding: 1rem 1.1rem;
+  }
+
+  .card .metrics {
+    gap: 1rem;
+    justify-content: center;
+  }
+
+  .chart-box {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 0.85rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  header {
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  section {
+    margin-bottom: 2rem;
+  }
+
+  .badge {
+    order: 3;
+  }
+
+  .theme-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .card .metrics {
+    flex-wrap: wrap;
+    gap: 0.85rem;
+  }
+
+  .card .metric {
+    min-width: 4.5rem;
+    text-align: center;
+  }
+
+  #charts-container {
+    grid-template-columns: 1fr;
+  }
+
+  .table-scroll {
+    overflow: visible;
+  }
+
+  #locations-table,
+  #locations-table thead,
+  #locations-table tbody,
+  #locations-table tfoot,
+  #locations-table tr,
+  #locations-table td {
+    display: block;
+    width: 100%;
+  }
+
+  #locations-table thead {
+    display: none;
+  }
+
+  #locations-table tbody tr,
+  #locations-table tfoot tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  #locations-table td {
+    border-bottom: 1px solid var(--border-sub);
+    padding: 0.65rem 0;
+  }
+
+  #locations-table tbody td::before,
+  #locations-table tfoot td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.35rem;
+  }
+
+  #locations-table tbody tr td:last-child,
+  #locations-table tfoot tr td:last-child {
+    border-bottom: none;
+  }
+
+  .actions {
+    white-space: normal;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .actions .btn,
+  #add-location-btn {
+    width: auto;
+  }
 }
 
 .btn-add    { background: #312e81; color: #c7d2fe; }

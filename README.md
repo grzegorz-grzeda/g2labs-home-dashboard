@@ -32,9 +32,11 @@ Copy `.env.example` to `.env` and adjust as needed (all values have defaults):
 cp .env.example .env
 ```
 
+Note: `.env.example` is a sample local-network configuration. If you omit a variable entirely, the application falls back to the runtime defaults listed below.
+
 ## Configuration
 
-| Variable | Default | Description |
+| Variable | Runtime default | Description |
 |---|---|---|
 | `MQTT_BROKER` | `mqtt://localhost:1883` | MQTT broker URL |
 | `MQTT_TOPIC` | `atc` | Topic to subscribe to (also subscribes to `atc/#`) |
